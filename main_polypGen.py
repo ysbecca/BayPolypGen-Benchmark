@@ -37,7 +37,26 @@ def plotInference( imgs, depth):
 def get_argparser():
     parser = argparse.ArgumentParser()
 
-    # Datset Options
+    # debiasing options
+    parser.add_argument("--epiupwt", type=str, default=True,
+                        help="use EpiUpWt de-biasing method during training")
+    parser.add_argument("--sharpen", type=str, default=False,
+                        help="use posterior sharpening method during training")
+    parser.add_argument("--kappa", type=float, default=4.0,
+                    help="weighting scalar")
+    parser.add_argument("--cycle_length", type=int, default=150,
+                    help="default cycle length")
+    parser.add_argument("--cycles", type=int, default=1,
+                    help="number of total inference cycles")
+    parser.add_argument("--models_per_cycle", type=int, default=5,
+                    help="number of posterior samples per cycle")
+    # TODO replace with true training set size
+    parser.add_argument("--temperature", type=float, default=1./8000,
+                    help="posterior cooling temperature")
+    parser.add_argument("--alpha", type=float, default=0.3,
+                    help="1: SGLD; <1: HMC")
+
+    # Dataset Options
     parser.add_argument("--data_root", type=str, default='./trainData_polypGen/',
                         help="path to Dataset")
     parser.add_argument("--dataType", type=str, default='polypGen',
@@ -49,7 +68,7 @@ def get_argparser():
     parser.add_argument("--download", action='store_true', default=False,
                         help="download datasets")
     # Deeplab Options
-    parser.add_argument("--model", type=str, default='resnet-Unet',
+    parser.add_argument("--model", type=str, default='deeplabv3plus_resnet50',
                         choices=['deeplabv3_resnet50',  'deeplabv3plus_resnet50',
                                  'deeplabv3_resnet101', 'deeplabv3plus_resnet101',
                                  'deeplabv3_mobilenet', 'deeplabv3plus_mobilenet', 'pspNet', 'segNet', 'FCN8', 'resnet-Unet', 'axial', 'unet'], help='model name')
@@ -93,7 +112,7 @@ def get_argparser():
     parser.add_argument("--loss_type", type=str, default='cross_entropy',
                         choices=['cross_entropy', 'focal_loss'], help="loss type (default: False)")
 
-    parser.add_argument("--gpu_id", type=str, default='2',
+    parser.add_argument("--gpu_id", type=str, default='0',
                         help="GPU ID")
     parser.add_argument("--weight_decay", type=float, default=1e-4,
                         help='weight decay (default: 1e-4)')
@@ -306,7 +325,7 @@ def main():
         optimizer = torch.optim.SGD(params=[
             {'params': model.backbone.parameters(), 'lr': 0.1*opts.lr},
             {'params': model.classifier.parameters(), 'lr': opts.lr},
-        ], lr=opts.lr, momentum=0.9, weight_decay=opts.weight_decay)  
+        ], lr=opts.lr, momentum=1.0 - opts.alpha, weight_decay=opts.weight_decay)  
         
     #optimizer = torch.optim.SGD(params=model.parameters(), lr=opts.lr, momentum=0.9, weight_decay=opts.weight_decay)
     #torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.lr_decay_step, gamma=opts.lr_decay_factor)
