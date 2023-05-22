@@ -259,6 +259,10 @@ def main():
     print("Dataset: %s, Train set: %d, Val set: %d" %
           (opts.dataset, len(train_dst), len(val_dst)))
 
+    # for tempering
+    train_size = len(train_dst)
+    num_batches = train_size / opts.batch_size + 1
+
     # Set up model
     if opts.model == 'pspNet':
         from network.network import PSPNet
@@ -329,10 +333,11 @@ def main():
         
     #optimizer = torch.optim.SGD(params=model.parameters(), lr=opts.lr, momentum=0.9, weight_decay=opts.weight_decay)
     #torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.lr_decay_step, gamma=opts.lr_decay_factor)
-    if opts.lr_policy=='poly':
-        scheduler = utils.PolyLR(optimizer, opts.total_itrs, power=0.9)
-    elif opts.lr_policy=='step':
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.step_size, gamma=0.1)
+    # if opts.lr_policy=='poly':
+    #     scheduler = utils.PolyLR(optimizer, opts.total_itrs, power=0.9)
+    # elif opts.lr_policy=='step':
+    #     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.step_size, gamma=0.1)
+    scheduler = None
 
     # Set up criterion
     #criterion = utils.get_loss(opts.loss_type)
@@ -354,27 +359,71 @@ def main():
         print("Model saved as %s" % path)
     
     utils.mkdir('checkpoints')
+
+    # bayesian csg-mcmc functions
+    def noise_loss(lr):
+        noise_loss = 0.0
+        noise_std = (2 / lr * opts.alpha)**0.5
+        for var in model.parameters():
+            means = torch.zeros(var.size()).to(device)
+            noise_loss += torch.sum(var * torch.normal(means, std=noise_std).to(device))
+
+        return noise_loss
+
+    def adjust_learning_rate(model, batch_idx, current_epoch):
+        rcounter = (current_epoch) * num_batches + batch_idx
+
+        cos_inner = np.pi * (rcounter % (opts.total_itrs // opts.cycles))
+        cos_inner /= opts.total_itrs // opts.cycles
+        cos_out = np.cos(cos_inner) + 1
+        lr = 0.5 * cos_out * opts.lr
+
+        if opts.alpha < 1.0:
+            # decay u-net backbone at same rate, factor 1/10 
+            param_group[0]['lr'] = 0.1*lr
+            param_group[1]['lr'] = lr
+
+        return lr
+
+    def update_params(model, lr, current_epoch):
+        """ manual update to params for HMC only not LD """
+        for p in model.parameters():
+            if not hasattr(p,'buf'):
+                p.buf = torch.zeros(p.size()).to(device)
+            d_p = p.grad.data
+            d_p.add_(p.data, alpha=opts.weight_decay)
+
+            buf_new = (1 - opts.alpha) * p.buf - lr * d_p
+            if (current_epoch % opts.cycle_length) + 1 > (opts.cycle_length - opts.models_per_cycle):
+                eps = torch.randn(p.size()).to(device)
+                buf_new += (2.0 * opts.lr * opts.alpha * opts.temperature / train_size)**.5 * eps
+            p.data.add_(buf_new)
+            p.buf = buf_new
+
+
     # Restore
     best_score = 0.0
     cur_itrs = 0
     cur_epochs = 0
-    if opts.ckpt is not None and os.path.isfile(opts.ckpt):
-        checkpoint = torch.load(opts.ckpt, map_location=torch.device('cpu'))
-        model.load_state_dict(checkpoint["model_state"])
-        model = nn.DataParallel(model)
-        model.to(device)
-        if opts.continue_training:
-            optimizer.load_state_dict(checkpoint["optimizer_state"])
-            scheduler.load_state_dict(checkpoint["scheduler_state"])
-            cur_itrs = checkpoint["cur_itrs"]
-            best_score = checkpoint['best_score']
-            print("Training state restored from %s" % opts.ckpt)
-        print("Model restored from %s" % opts.ckpt)
-        del checkpoint  # free memory
-    else:
-        print("[!] Retrain")
-        model = nn.DataParallel(model)
-        model.to(device)
+
+    # TODO rewrite for Bay version
+    # if opts.ckpt is not None and os.path.isfile(opts.ckpt):
+    #     checkpoint = torch.load(opts.ckpt, map_location=torch.device('cpu'))
+    #     model.load_state_dict(checkpoint["model_state"])
+    #     model = nn.DataParallel(model)
+    #     model.to(device)
+    #     if opts.continue_training:
+    #         optimizer.load_state_dict(checkpoint["optimizer_state"])
+    #         scheduler.load_state_dict(checkpoint["scheduler_state"])
+    #         cur_itrs = checkpoint["cur_itrs"]
+    #         best_score = checkpoint['best_score']
+    #         print("Training state restored from %s" % opts.ckpt)
+    #     print("Model restored from %s" % opts.ckpt)
+    #     del checkpoint  # free memory
+    # else:
+    #     print("[!] Retrain")
+    #     model = nn.DataParallel(model)
+    #     model.to(device)
 
     #==========   Train Loop   ==========#
     vis_sample_id = np.random.randint(0, len(val_loader), opts.vis_num_samples,
@@ -386,7 +435,7 @@ def main():
         # =====  Train  =====
         model.train()
         cur_epochs += 1
-        for (images, labels) in train_loader:
+        for batch_idx, (images, labels) in enumerate(train_loader):
             cur_itrs += 1
 
             images = images.to(device, dtype=torch.float32)
@@ -394,8 +443,20 @@ def main():
      
             optimizer.zero_grad()
             outputs = model(images)
-            loss = criterion(outputs, labels) 
-            loss.backward()
+            loss = criterion(outputs, labels)
+
+            lr = adjust_learning_rate(batch_idx, cur_epochs)
+            
+            if opts.alpha == 1.0:
+                if (cur_epochs % opts.cycle_length) + 1 > (opts.cycle_length - opts.models_per_cycle):
+                    loss_noise = noise_loss(lr) * (opts.temperature / train_size)**.5
+                    loss += loss_noise
+                loss.backward()
+
+            else:  # alpha < 1.0 is HMC
+                loss.backward()
+                update_params(lr, cur_epochs)
+
             optimizer.step()
 
             np_loss = loss.detach().cpu().numpy()
@@ -434,7 +495,8 @@ def main():
                         concat_img = np.concatenate((img, target, lbl), axis=2)  # concat along width
                         vis.vis_image('Sample %d' % k, concat_img)
                 model.train()
-            scheduler.step()  
+            if scheduler:
+                scheduler.step()  
 
             if cur_itrs >=  opts.total_itrs:
                 return
