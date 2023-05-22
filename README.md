@@ -1,4 +1,8 @@
-# PolypGen-Benchmark
+# BayPolypGen-Benchmark
+
+Bayesian debiasing method test
+
+
 
 ### Brief description:
 
