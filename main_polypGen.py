@@ -23,6 +23,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 from skimage.transform import resize
 
+import random
+import string
+from nltk.corpus import words
+
 def plotInference( imgs, depth):
     f =  plt.figure()
     f.add_subplot(1,2, 1)
@@ -170,6 +174,92 @@ def get_dataset(opts):
     return train_dst, val_dst
 
 
+# TODO
+def evaluate()
+    """ perform validation (inference) on validation set sampling from posterior """
+
+    # load moments
+    # pass thru and save...
+
+    # compute mu and epis
+    # save preds and epis...
+
+    # print out metrics
+
+    pass
+
+
+def generate_unique_name(num_words=3, word_length=6):
+    word_list = words.words()
+    words = random.choices(word_list, k=num_words)
+    unique_name = '_'.join(words)
+    return unique_name.lower()
+
+
+def bay_inference(opts, model, loader, device, metrics, mt_count=0, ret_samples_ids=None, model_desc=None):
+    """ Do Bayesian inference from posterior samples and return metrics, preds and epis. """
+    metrics.reset()
+    ret_samples = []
+    directoryName = 'results_%s_%s'%(opts.dataType, opts.model)
+    # if opts.save_val_results:
+    #     if not os.path.exists(directoryName):
+    #         os.mkdir(directoryName)
+    #     denorm = utils.Denormalize(mean=[0.485, 0.456, 0.406], 
+    #                                std=[0.229, 0.224, 0.225])
+    #     img_id = 0
+
+    with torch.no_grad():
+
+        def get_targets_from_dataloader(dataloader):
+            targets = []
+            for _, target in dataloader:
+                targets.append(target)
+            targets_tensor = torch.tensor(targets)
+            return targets_tensor
+
+        targets = get_targets_from_dataloader(loader).cpu().numpy()
+
+
+        m_logits = {i: [] for i in range(mt_count)}
+        for m in range(mt_count):
+            moment_path = f"moments/{model_desc}_{moment_id}.pt"
+            moment_ckpt = torch.load(moment_path, map_location=torch.device('cpu'))
+           
+            model.load_state_dict(checkpoint["model_state"])
+            model = model.to(device)
+
+            for i, (images, labels) in enumerate(loader):
+                
+                images = images.to(device, dtype=torch.float32)
+                outputs = model(images)
+                preds = outputs.detach().max(dim=1)[1].cpu().numpy()
+                print("preds.shape", preds.shape)
+                exit()
+
+                m_logits[m].append(preds)
+                
+        # [N_MOMENTS, N_SAMPLES, N_CLASSES]
+        m_logits = torch.stack([torch.cat(m_logits[m], dim=0) for i in range(mt_count)])
+        # [SAMPLES, N_CLASSES]
+        m_preds = m_logits.mean(dim=0)
+
+        # TODO check the shape here; need another mean across dims probably!
+        print("m_shape.shape", m_shape.shape)
+        exit()
+
+        # accumulate epistemic uncertainties
+        temp = (m_logits - m_preds.expand((mt_count, *m_preds.shape)))**2
+        epis_ = torch.sqrt(torch.sum(temp, axis=0)) / mt_count
+        epis_ = torch.Tensor([e[int(i)] for e, i in zip(epis_, targets)]).double().to(device)
+        epis = epis_ * 10.
+
+    metrics.update(targets, m_preds)
+    score = metrics.get_results()
+
+    return score
+
+
+
 def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
     """Do validation and return specified samples"""
     metrics.reset()
@@ -227,6 +317,7 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
 
 
 def main():
+
     opts = get_argparser().parse_args()
     if opts.dataset.lower() == 'voc':
         opts.num_classes = 2 # foreground + background
@@ -346,6 +437,18 @@ def main():
     elif opts.loss_type == 'cross_entropy':
         criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
 
+
+    model_desc = generate_unique_name()
+    while os.path.exists(f"moments/{model_desc}"):
+        print("[ERROR] {model_desc} already exists.")
+        model_desc = generate_unique_name()
+    
+    print()
+    print("="*20)
+    print(model_desc)
+    print("="*20)
+    utils.mkdir(f"moments/{model_desc}")
+
     def save_ckpt(path):
         """ save current model
         """
@@ -359,6 +462,16 @@ def main():
         print("Model saved as %s" % path)
     
     utils.mkdir('checkpoints')
+
+    def save_moment(moment_id):
+        """ save moment checkpoint
+        """
+        path = f"moments/{model_desc}_{moment_id}.pt"
+        torch.save({
+            "model_state": model.module.state_dict(),
+        }, path)
+        print(f"Model MOMENT {moment_id} saved *")
+
 
     # bayesian csg-mcmc functions
     def noise_loss(lr):
@@ -435,6 +548,7 @@ def main():
         # =====  Train  =====
         model.train()
         cur_epochs += 1
+        moment_count = 0
         for batch_idx, (images, labels) in enumerate(train_loader):
             cur_itrs += 1
 
@@ -464,6 +578,11 @@ def main():
             if vis is not None:
                 vis.vis_scalar('Loss', cur_itrs, np_loss)
 
+            # within sampling phase
+            if (cur_epochs % opts.cycle_length) + 1 > opts.cycle_length - opts.models_per_cycle:
+                save_moment(moment_count)
+                moment_count += 1 
+
             if (cur_itrs) % 10 == 0:
                 interval_loss = interval_loss/10
                 print("Epoch %d, Itrs %d/%d, Loss=%f" %
@@ -476,7 +595,13 @@ def main():
                 print("validation...")
                 model.eval()
                 val_score, ret_samples = validate(
-                    opts=opts, model=model, loader=val_loader, device=device, metrics=metrics, ret_samples_ids=vis_sample_id)
+                    opts=opts,
+                    model=model,
+                    loader=val_loader,
+                    device=device,
+                    metrics=metrics,
+                    ret_samples_ids=vis_sample_id,
+                )
                 print(metrics.to_str(val_score))
                 if val_score['Mean IoU'] > best_score:  # save best model
                     best_score = val_score['Mean IoU']
@@ -499,7 +624,10 @@ def main():
                 scheduler.step()  
 
             if cur_itrs >=  opts.total_itrs:
-                return
+                break
+
+
+    # evaluate()
         
 if __name__ == '__main__':
     main()
