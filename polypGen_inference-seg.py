@@ -55,7 +55,7 @@ def get_argparser():
                                  'deeplabv3_resnet101', 'deeplabv3plus_resnet101',
                                  'deeplabv3_mobilenet', 'deeplabv3plus_mobilenet', 'pspNet', 'segNet', 'FCN8', 'resnet-Unet', 'axial', 'unet'], help='model name')
 
-    parser.add_argument("--backbone", type=str, default='resnet101',
+    parser.add_argument("--backbone", type=str, default='resnet50',
                         choices=['vgg19',  'resnet34' , 'resnet50',
                                  'resnet101', 'densenet121', 'none'], help='model name')
 
@@ -140,7 +140,7 @@ def mymodel():
         model = model_map[opts.model](num_classes=opts.num_classes, output_stride=opts.output_stride)
     model = nn.DataParallel(model)
         
-    checkpoint = torch.load(opts.ckpt)
+    checkpoint = torch.load(opts.ckpt, map_location=device)
     # model.load_state_dict(checkpoint["model_state"])
     state_dict =checkpoint['model_state']
     from collections import OrderedDict
@@ -203,13 +203,13 @@ if __name__ == '__main__':
     subDirs = ['EndoCV_DATA1', 'EndoCV_DATA2', 'EndoCV_DATA3', 'EndoCV_DATA4']
     
 #    last directory is for the data paper --> these are single and sequence datasets respectively, please change the names accordingly
-    subDirs = ['EndoCV_DATA4', 'EndoCV_DATAPaperC6']
-    
+    #subDirs = ['EndoCV_DATA4', 'EndoCV_DATAPaperC6']
+    subDirs = ['images_C6']
     for j in range(0, len(subDirs)):
         
         # ---> Folder for test data location!!! (Warning!!! do not copy/visulise!!!)
-        imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
-        
+        #imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
+        imgfolder='/resstore/b0211/Users/scpecs/datasets/EndoCV2021/data_C6/' + subDirs[j]
         # set folder to save your checkpoints here!
         saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
     
@@ -225,8 +225,8 @@ if __name__ == '__main__':
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
     
-        start = torch.cuda.Event(enable_timing=True)
-        end = torch.cuda.Event(enable_timing=True)
+        #start = torch.cuda.Event(enable_timing=True)
+        #end = torch.cuda.Event(enable_timing=True)
         file = open(saveDir + '/'+"timeElaspsed" + subDirs[j] +'.txt', mode='w')
         timeappend = []
     
@@ -245,14 +245,14 @@ if __name__ == '__main__':
             #            
             img = skimage.io.imread(imagePath)
             size=img.shape
-            start.record()
+            #start.record()
             #
             outputs = model(images.unsqueeze(0))
             #
-            end.record()
-            torch.cuda.synchronize()
-            print(start.elapsed_time(end))
-            timeappend.append(start.elapsed_time(end))
+            #end.record()
+            #torch.cuda.synchronize()
+            #print(start.elapsed_time(end))
+            #timeappend.append(start.elapsed_time(end))
             #
             
             preds = outputs.detach().max(dim=1)[1].cpu().numpy()   
@@ -264,10 +264,10 @@ if __name__ == '__main__':
             
             
             file.write('%s -----> %s \n' % 
-               (filename, start.elapsed_time(end)))
-            
+               (filename, 0))
+            #start.elapsed_time(end)
     
             # TODO: write time in a text file
         
-        file.write('%s -----> %s \n' % 
-           ('average_t', np.mean(timeappend)))
+        #file.write('%s -----> %s \n' % 
+           #('average_t', np.mean(timeappend)))
