@@ -50,10 +50,15 @@ def get_argparser():
 
     # Deeplab Options
     
-    parser.add_argument("--model", type=str, default='resnet-Unet',
+    parser.add_argument("--model", type=str, default='deeplabv3_resnet50',
                         choices=['deeplabv3_resnet50',  'deeplabv3plus_resnet50',
                                  'deeplabv3_resnet101', 'deeplabv3plus_resnet101',
                                  'deeplabv3_mobilenet', 'deeplabv3plus_mobilenet', 'pspNet', 'segNet', 'FCN8', 'resnet-Unet', 'axial', 'unet'], help='model name')
+
+    parser.add_argument("--model_desc", type=str, default='None',
+                        help='model description for loading moments')
+    parser.add_argument("--moment_count", type=int, default='5',
+                        help="total number of moments from posterior")
 
     parser.add_argument("--backbone", type=str, default='resnet101',
                         choices=['vgg19',  'resnet34' , 'resnet50',
@@ -87,6 +92,12 @@ def mymodel():
         DESCRIPTION.
     '''
     opts = get_argparser().parse_args() 
+
+    print("Model description: ", opts.model_desc)
+    print("Moment count:      ", opts.moment_count)
+
+    print("="*30)
+
     # ---> explicit classs number
     opts.num_classes = 2
     
@@ -138,26 +149,22 @@ def mymodel():
     
     
         model = model_map[opts.model](num_classes=opts.num_classes, output_stride=opts.output_stride)
-    model = nn.DataParallel(model)
+    
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
         
-    checkpoint = torch.load(opts.ckpt)
-    # model.load_state_dict(checkpoint["model_state"])
-    state_dict =checkpoint['model_state']
-    from collections import OrderedDict
-    new_state_dict = OrderedDict()
-
-    for k, v in state_dict.items():
-        if 'module' not in k:
-            k = 'module.'+k
-        else:
-            k = k.replace('features.module.', 'module.features.')
-        new_state_dict[k]=v
-
-    model.load_state_dict(new_state_dict)
-
-    model.eval()
     return model, device
 
+
+def load_moment(moment_id, model):
+
+    checkpoint = torch.load(f"moments/{opts.model_desc}_{moment_id}.pt")
+    state_dict = checkpoint['model_state']
+    
+    model.load_state_dict(new_state_dict)
+    model.eval()
+
+    return model
 
         
 if __name__ == '__main__':
@@ -177,6 +184,9 @@ if __name__ == '__main__':
             --> Yes, but please make sure that you follow the rules. Any visulization or copy of test data is against the challenge rules. We make sure that the 
             competition is fair and results are replicative.
     '''
+
+    print(torch.cuda.is_available(), torch.cuda.device_count())
+
     model, device = mymodel()
 
     opts = get_argparser().parse_args() 
@@ -205,11 +215,14 @@ if __name__ == '__main__':
 #    last directory is for the data paper --> these are single and sequence datasets respectively, please change the names accordingly
     subDirs = ['EndoCV_DATA4', 'EndoCV_DATAPaperC6']
     
+    all_epistemics = []
+    
     for j in range(0, len(subDirs)):
         
         # ---> Folder for test data location!!! (Warning!!! do not copy/visulise!!!)
-        imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
-        
+        # imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
+        imgfolder = 'Blah'
+
         # set folder to save your checkpoints here!
         saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
     
@@ -229,7 +242,8 @@ if __name__ == '__main__':
         end = torch.cuda.Event(enable_timing=True)
         file = open(saveDir + '/'+"timeElaspsed" + subDirs[j] +'.txt', mode='w')
         timeappend = []
-    
+
+
         for imagePath in imgfiles[:]:
             """plt.imshow(img1[:,:,(2,1,0)])
             Grab the name of the file. 
@@ -247,27 +261,57 @@ if __name__ == '__main__':
             size=img.shape
             start.record()
             #
-            outputs = model(images.unsqueeze(0))
-            #
+
+            # bayesian pass thru all moments
+            m_preds = []
+
+            for m in range(opts.moment_count):
+                model = load_moment(moment_id, model)
+                outputs = model(images.unsqueeze(0))
+                pred = outputs.detach().max(dim=1)[1].cpu().numpy()[0]*255
+                pred = pred.astype(np.uint8)
+                m_preds.append(pred)
+                print("pred.shape", pred.shape)
+
+
             end.record()
             torch.cuda.synchronize()
             print(start.elapsed_time(end))
             timeappend.append(start.elapsed_time(end))
-            #
-            
-            preds = outputs.detach().max(dim=1)[1].cpu().numpy()   
-            pred = preds[0]*255.0 
-            pred = (pred).astype(np.uint8)
-            
-            img_mask=skimage.transform.resize(pred, (size[0], size[1]), anti_aliasing=True) 
+
+            # [MOMENTS, PRED_w, PRED_h]
+            m_preds = torch.stack([torch.cat(m_preds[i], dim=0) for i in range(opts.moment_count)])
+            print("m_preds.shape", m_preds.shape)
+            # get epistemic uncertainties.... and average for single value 
+            # accumulate epistemic uncertainties
+            temp = (m_preds - m_preds.expand((opts.moment_count, *m_preds.shape)))**2
+            epis_ = torch.sqrt(torch.sum(temp, axis=0)) / opts.moment_count
+            epis_ = epis_.double() #.to(device)
+
+            print("epis_.shape", epis_.shape)
+
+            # take mean
+            epi = epis_.mean()
+            print("epi", epi)
+            all_epistemics.append(epi)
+
+            exit()
+            # final averaged prediction seg map
+            # [PRED_w, PRED_h]
+            m_preds = m_preds.mean(dim=0)
+
+            img_mask = skimage.transform.resize(m_preds, (size[0], size[1]), anti_aliasing=True) 
+
             imsave(saveDir +'/'+ filename +'_mask.jpg',(img_mask*255.0).astype('uint8'))
             
             
             file.write('%s -----> %s \n' % 
                (filename, start.elapsed_time(end)))
-            
-    
-            # TODO: write time in a text file
         
+
+        # TODO accumulate all epi values and then print to file
+        # all_epistemics
+        
+
         file.write('%s -----> %s \n' % 
            ('average_t', np.mean(timeappend)))

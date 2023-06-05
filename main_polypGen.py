@@ -42,7 +42,7 @@ def get_argparser():
     parser = argparse.ArgumentParser()
 
     # debiasing options
-    parser.add_argument("--epiupwt", type=str, default=True,
+    parser.add_argument("--epiupwt", type=str, default=False,
                         help="use EpiUpWt de-biasing method during training")
     parser.add_argument("--sharpen", type=str, default=False,
                         help="use posterior sharpening method during training")
@@ -78,7 +78,7 @@ def get_argparser():
                                  'deeplabv3_mobilenet', 'deeplabv3plus_mobilenet', 'pspNet', 'segNet', 'FCN8', 'resnet-Unet', 'axial', 'unet'], help='model name')
 
     # if unet backbone
-    parser.add_argument("--backbone", type=str, default='resnet101',
+    parser.add_argument("--backbone", type=str, default='resnet50',
                         choices=['vgg19',  'resnet34' , 'resnet50',
                                  'resnet101', 'densenet121', 'none'], help='model name')
 
@@ -175,7 +175,7 @@ def get_dataset(opts):
 
 
 # TODO
-def evaluate()
+def evaluate():
     """ perform validation (inference) on validation set sampling from posterior """
 
     # load moments
@@ -185,7 +185,7 @@ def evaluate()
     # save preds and epis...
 
     # print out metrics
-
+    print("evaluation TBD")
     pass
 
 
@@ -239,7 +239,7 @@ def bay_inference(opts, model, loader, device, metrics, mt_count=0, ret_samples_
                 m_logits[m].append(preds)
                 
         # [N_MOMENTS, N_SAMPLES, N_CLASSES]
-        m_logits = torch.stack([torch.cat(m_logits[m], dim=0) for i in range(mt_count)])
+        m_logits = torch.stack([torch.cat(m_logits[i], dim=0) for i in range(mt_count)])
         # [SAMPLES, N_CLASSES]
         m_preds = m_logits.mean(dim=0)
 
@@ -545,6 +545,7 @@ def main():
 
     interval_loss = 0
     while True: 
+
         # =====  Train  =====
         model.train()
         cur_epochs += 1
@@ -626,8 +627,16 @@ def main():
             if cur_itrs >=  opts.total_itrs:
                 break
 
-
-    # evaluate()
+    bay_inference(
+        opts,
+        model,
+        loader,
+        device,
+        metrics,
+        mt_count=moment_count,
+        ret_samples_ids=None,
+        model_desc=model_desc
+    )
         
 if __name__ == '__main__':
     main()
