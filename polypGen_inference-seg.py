@@ -60,7 +60,7 @@ def get_argparser():
     parser.add_argument("--moment_count", type=int, default='5',
                         help="total number of moments from posterior")
 
-    parser.add_argument("--backbone", type=str, default='resnet101',
+    parser.add_argument("--backbone", type=str, default='resnet50',
                         choices=['vgg19',  'resnet34' , 'resnet50',
                                  'resnet101', 'densenet121', 'none'], help='model name')
 
@@ -154,6 +154,19 @@ def mymodel():
         model = nn.DataParallel(model)
         
     return model, device
+    # checkpoint = torch.load(opts.ckpt, map_location=device)
+    # # model.load_state_dict(checkpoint["model_state"])
+    # state_dict =checkpoint['model_state']
+    # from collections import OrderedDict
+    # new_state_dict = OrderedDict()
+
+    # for k, v in state_dict.items():
+    #     if 'module' not in k:
+    #         k = 'module.'+k
+    #     else:
+    #         k = k.replace('features.module.', 'module.features.')
+    #     new_state_dict[k]=v
+
 
 
 def load_moment(moment_id, model):
@@ -210,19 +223,19 @@ if __name__ == '__main__':
     # ----> three test folders [https://github.com/sharibox/EndoCV2021-polyp_det_seg_gen/wiki/EndoCV2021-Leaderboard-guide]
     
 #    please uncomment for challenge paper -->
-    subDirs = ['EndoCV_DATA1', 'EndoCV_DATA2', 'EndoCV_DATA3', 'EndoCV_DATA4']
+    # subDirs = ['EndoCV_DATA1', 'EndoCV_DATA2', 'EndoCV_DATA3', 'EndoCV_DATA4']
     
 #    last directory is for the data paper --> these are single and sequence datasets respectively, please change the names accordingly
-    subDirs = ['EndoCV_DATA4', 'EndoCV_DATAPaperC6']
-    
+
     all_epistemics = []
-    
+
+    #subDirs = ['EndoCV_DATA4', 'EndoCV_DATAPaperC6']
+    subDirs = ['images_C6']
     for j in range(0, len(subDirs)):
         
         # ---> Folder for test data location!!! (Warning!!! do not copy/visulise!!!)
-        # imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
-        imgfolder = 'Blah'
-
+        #imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
+        imgfolder = '/resstore/b0211/Users/scpecs/datasets/EndoCV2021/data_C6/' + subDirs[j]
         # set folder to save your checkpoints here!
         saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
     
@@ -238,8 +251,8 @@ if __name__ == '__main__':
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
     
-        start = torch.cuda.Event(enable_timing=True)
-        end = torch.cuda.Event(enable_timing=True)
+        #start = torch.cuda.Event(enable_timing=True)
+        #end = torch.cuda.Event(enable_timing=True)
         file = open(saveDir + '/'+"timeElaspsed" + subDirs[j] +'.txt', mode='w')
         timeappend = []
 
@@ -259,8 +272,7 @@ if __name__ == '__main__':
             #            
             img = skimage.io.imread(imagePath)
             size=img.shape
-            start.record()
-            #
+            #start.record()
 
             # bayesian pass thru all moments
             m_preds = []
@@ -304,14 +316,11 @@ if __name__ == '__main__':
 
             imsave(saveDir +'/'+ filename +'_mask.jpg',(img_mask*255.0).astype('uint8'))
             
-            
-            file.write('%s -----> %s \n' % 
-               (filename, start.elapsed_time(end)))
-        
 
         # TODO accumulate all epi values and then print to file
         # all_epistemics
         
 
-        file.write('%s -----> %s \n' % 
-           ('average_t', np.mean(timeappend)))
+    file.write('%s -----> %s \n' % 
+       ('average_t', np.mean(timeappend)))
+
