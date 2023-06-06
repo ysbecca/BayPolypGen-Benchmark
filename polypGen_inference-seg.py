@@ -19,6 +19,8 @@ from skimage import io
 from  tifffile import imsave
 import skimage.transform
 
+import matplotlib.pyplot as plt
+
 def create_predFolder(task_type):
     directoryName = 'EndoCV2021'
     if not os.path.exists(directoryName):
@@ -55,9 +57,9 @@ def get_argparser():
                                  'deeplabv3_resnet101', 'deeplabv3plus_resnet101',
                                  'deeplabv3_mobilenet', 'deeplabv3plus_mobilenet', 'pspNet', 'segNet', 'FCN8', 'resnet-Unet', 'axial', 'unet'], help='model name')
 
-    parser.add_argument("--model_desc", type=str, default='None',
+    parser.add_argument("--model_desc", type=str, default='test',
                         help='model description for loading moments')
-    parser.add_argument("--moment_count", type=int, default='5',
+    parser.add_argument("--moment_count", type=int, default='2',
                         help="total number of moments from posterior")
 
     parser.add_argument("--backbone", type=str, default='resnet50',
@@ -150,6 +152,7 @@ def mymodel():
     
         model = model_map[opts.model](num_classes=opts.num_classes, output_stride=opts.output_stride)
     
+    model = model.to(device)
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
         
@@ -169,12 +172,12 @@ def mymodel():
 
 
 
-def load_moment(moment_id, model):
+def load_moment(moment_id, model, device):
 
-    checkpoint = torch.load(f"moments/{opts.model_desc}_{moment_id}.pt")
+    checkpoint = torch.load(f"moments/{opts.model_desc}_{moment_id}.pt", map_location=device)
     state_dict = checkpoint['model_state']
-    
-    model.load_state_dict(new_state_dict)
+
+    model.load_state_dict(state_dict)
     model.eval()
 
     return model
@@ -197,8 +200,9 @@ if __name__ == '__main__':
             --> Yes, but please make sure that you follow the rules. Any visulization or copy of test data is against the challenge rules. We make sure that the 
             competition is fair and results are replicative.
     '''
-
-    print(torch.cuda.is_available(), torch.cuda.device_count())
+    # weird thing where if I don't call it here it can't find it later
+    torch.cuda.is_available()
+    torch.cuda.device_count()
 
     model, device = mymodel()
 
@@ -235,7 +239,10 @@ if __name__ == '__main__':
         
         # ---> Folder for test data location!!! (Warning!!! do not copy/visulise!!!)
         #imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
-        imgfolder = '/resstore/b0211/Users/scpecs/datasets/EndoCV2021/data_C6/' + subDirs[j]
+        # imgfolder = '/resstore/b0211/Users/scpecs/datasets/EndoCV2021/data_C6/' + subDirs[j]
+        
+        imgfolder = '/usr/not-backed-up/BayPolypGen-Benchmark/datasets/EndoCV2021/data_C6/' + subDirs[j]
+
         # set folder to save your checkpoints here!
         saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
     
@@ -253,9 +260,8 @@ if __name__ == '__main__':
     
         #start = torch.cuda.Event(enable_timing=True)
         #end = torch.cuda.Event(enable_timing=True)
-        file = open(saveDir + '/'+"timeElaspsed" + subDirs[j] +'.txt', mode='w')
-        timeappend = []
-
+        # file = open(saveDir + '/'+"timeElaspsed" + subDirs[j] +'.txt', mode='w')
+        # timeappend = []
 
         for imagePath in imgfiles[:]:
             """plt.imshow(img1[:,:,(2,1,0)])
@@ -268,17 +274,17 @@ if __name__ == '__main__':
             image = data_transforms(img1)
             # perform inference here:
             images = image.to(device, dtype=torch.float32)
-            
             #            
-            img = skimage.io.imread(imagePath)
-            size=img.shape
+            size = skimage.io.imread(imagePath).shape
             #start.record()
 
             # bayesian pass thru all moments
             m_preds = []
 
             for m in range(opts.moment_count):
-                model = load_moment(moment_id, model)
+                model = load_moment(m, model, device)
+
+
                 outputs = model(images.unsqueeze(0))
                 pred = outputs.detach().max(dim=1)[1].cpu().numpy()[0]*255
                 pred = pred.astype(np.uint8)
@@ -286,41 +292,41 @@ if __name__ == '__main__':
                 print("pred.shape", pred.shape)
 
 
-            end.record()
-            torch.cuda.synchronize()
-            print(start.elapsed_time(end))
-            timeappend.append(start.elapsed_time(end))
+            # end.record()
+            # torch.cuda.synchronize()
+            # print(start.elapsed_time(end))
+            # timeappend.append(start.elapsed_time(end))
 
             # [MOMENTS, PRED_w, PRED_h]
-            m_preds = torch.stack([torch.cat(m_preds[i], dim=0) for i in range(opts.moment_count)])
-            print("m_preds.shape", m_preds.shape)
+            m_preds = np.array(m_preds)
             # get epistemic uncertainties.... and average for single value 
             # accumulate epistemic uncertainties
-            temp = (m_preds - m_preds.expand((opts.moment_count, *m_preds.shape)))**2
-            epis_ = torch.sqrt(torch.sum(temp, axis=0)) / opts.moment_count
-            epis_ = epis_.double() #.to(device)
-
-            print("epis_.shape", epis_.shape)
+            temp = (m_preds - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
+            epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
+            epis_ = epis_.astype(np.double)
 
             # take mean
             epi = epis_.mean()
             print("epi", epi)
             all_epistemics.append(epi)
 
-            exit()
             # final averaged prediction seg map
             # [PRED_w, PRED_h]
-            m_preds = m_preds.mean(dim=0)
+            m_preds = np.mean(m_preds, axis=0)
+            print(m_preds.shape)
 
-            img_mask = skimage.transform.resize(m_preds, (size[0], size[1]), anti_aliasing=True) 
+            img_mask = skimage.transform.resize(m_preds, (size[0], size[1]), anti_aliasing=True)
+            print(img_mask.shape)
 
-            imsave(saveDir +'/'+ filename +'_mask.jpg',(img_mask*255.0).astype('uint8'))
-            
+            pil_image = Image.fromarray(img_mask.astype(np.uint8))
+            pil_image.save(saveDir +'/'+ filename +'_mask.jpg')
 
-        # TODO accumulate all epi values and then print to file
-        # all_epistemics
-        
+            # imsave(saveDir +'/'+ filename +'_mask.jpg', img_mask.astype(np.uint8))
 
-    file.write('%s -----> %s \n' % 
-       ('average_t', np.mean(timeappend)))
+    all_epistemics = np.array(all_epistemics)
+    print(all_epistemics.shape)
+    np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
+
+    # file.write('%s -----> %s \n' % 
+       # ('average_t', np.mean(timeappend)))
 
