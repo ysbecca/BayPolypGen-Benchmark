@@ -268,7 +268,7 @@ if __name__ == '__main__':
             Grab the name of the file. 
             """
             filename = (imagePath.split('/')[-1]).split('.jpg')[0]
-            print('filename is printing::=====>>', filename)
+            print('filename is printing :: =====>>', filename)
             
             img1 = Image.open(imagePath).convert('RGB').resize((512,512), resample=0)
             image = data_transforms(img1)
@@ -289,7 +289,6 @@ if __name__ == '__main__':
                 pred = outputs.detach().max(dim=1)[1].cpu().numpy()[0]*255
                 pred = pred.astype(np.uint8)
                 m_preds.append(pred)
-                print("pred.shape", pred.shape)
 
 
             # end.record()
@@ -313,10 +312,7 @@ if __name__ == '__main__':
             # final averaged prediction seg map
             # [PRED_w, PRED_h]
             m_preds = np.mean(m_preds, axis=0)
-            print(m_preds.shape)
-
             img_mask = skimage.transform.resize(m_preds, (size[0], size[1]), anti_aliasing=True)
-            print(img_mask.shape)
 
             pil_image = Image.fromarray(img_mask.astype(np.uint8))
             pil_image.save(saveDir +'/'+ filename +'_mask.jpg')
@@ -324,7 +320,6 @@ if __name__ == '__main__':
             # imsave(saveDir +'/'+ filename +'_mask.jpg', img_mask.astype(np.uint8))
 
     all_epistemics = np.array(all_epistemics)
-    print(all_epistemics.shape)
     np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
 
     # file.write('%s -----> %s \n' % 
