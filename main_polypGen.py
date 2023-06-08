@@ -7,7 +7,7 @@ import argparse
 import numpy as np
 
 from torch.utils import data
-
+import wandb
 
 from datasets import VOCSegmentation_polypGen2021 as polyGenSeg
 
@@ -41,6 +41,9 @@ def plotInference( imgs, depth):
 def get_argparser():
     parser = argparse.ArgumentParser()
 
+    parser.add_argument("--dev_run", type=bool, default=False,
+                        help='does not save checkpoints or log metrics when in dev mode')
+
     # debiasing options
     parser.add_argument("--epiupwt", type=str, default=False,
                         help="use EpiUpWt de-biasing method during training")
@@ -55,13 +58,16 @@ def get_argparser():
     parser.add_argument("--models_per_cycle", type=int, default=5,
                     help="number of posterior samples per cycle")
     # TODO replace with true training set size
-    parser.add_argument("--temperature", type=float, default=1./8000,
+    parser.add_argument("--temperature", type=float, default=1./1159,
                     help="posterior cooling temperature")
     parser.add_argument("--alpha", type=float, default=0.3,
                     help="1: SGLD; <1: HMC")
 
     # Dataset Options
-    parser.add_argument("--data_root", type=str, default='./trainData_polypGen/',
+    parser.add_argument("--root", type=str, default="",
+                        help='absolute path to EndoCV2021')
+
+    parser.add_argument("--data_root", type=str, default='EndoCV2021/trainData_polypGen/',
                         help="path to Dataset")
     parser.add_argument("--dataType", type=str, default='polypGen',
                         help="path to Dataset")
@@ -93,7 +99,7 @@ def get_argparser():
     parser.add_argument("--save_val_results", action='store_true', default=True,
                         help="save segmentation results to \"./results_polypGen\"")
     
-    parser.add_argument("--total_itrs", type=int, default=30e3,
+    parser.add_argument("--total_itrs", type=int, default=30e3, # not used for bay numbers
                         help="epoch number (default: 30k)")
     parser.add_argument("--lr", type=float, default=0.01,
                         help="learning rate (default: 0.01)")
@@ -167,8 +173,8 @@ def get_dataset(opts):
                                 std=[0.229, 0.224, 0.225]),
             ])
             
-    train_dst = polyGenSeg(root=opts.data_root, image_set='train_polypGen', download=opts.download, transform=train_transform)
-    val_dst = polyGenSeg(root=opts.data_root, 
+    train_dst = polyGenSeg(root=opts.root + opts.data_root, image_set='train_polypGen', download=opts.download, transform=train_transform)
+    val_dst = polyGenSeg(root=opts.root + opts.data_root, 
                                   image_set='val_polypGen', download=False, transform=val_transform)
         
     return train_dst, val_dst
@@ -187,14 +193,6 @@ def evaluate():
     # print out metrics
     print("evaluation TBD")
     pass
-
-
-def generate_unique_name(num_words=3, word_length=6):
-    word_list = words.words()
-    words = random.choices(word_list, k=num_words)
-    unique_name = '_'.join(words)
-    return unique_name.lower()
-
 
 def bay_inference(opts, model, loader, device, metrics, mt_count=0, ret_samples_ids=None, model_desc=None):
     """ Do Bayesian inference from posterior samples and return metrics, preds and epis. """
@@ -258,8 +256,6 @@ def bay_inference(opts, model, loader, device, metrics, mt_count=0, ret_samples_
 
     return score
 
-
-
 def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
     """Do validation and return specified samples"""
     metrics.reset()
@@ -317,10 +313,39 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
 
 
 def main():
+    torch.cuda.is_available()
+    torch.cuda.device_count()
 
     opts = get_argparser().parse_args()
     if opts.dataset.lower() == 'voc':
         opts.num_classes = 2 # foreground + background
+
+    model_desc = "test"
+    if not opts.dev_run:        
+        project_name = "baybaseline"
+        if opts.epiupwt:
+            project_name = "epiupwt"
+        elif opts.sharpen:
+            project_name = "sharpen"
+
+        wandb.init(
+            project=project_name,
+            config={
+                "learning_rate": opts.lr,
+                "cycle_length": opts.cycle_length,
+                "cycles": opts.cycles,
+                "alpha": opts.alpha,
+                "kappa": opts.kappa,
+                "models_per_cycle": opts.models_per_cycle,
+            }
+        )
+
+        model_desc = wandb.run.name
+        print(f"Running new experiment under {project_name} named: {wandb.run.name}")
+        if os.path.exists(f"moments/{model_desc}"):
+            print("[ERROR] {model_desc} already exists. Aborting.")
+            exit()
+        utils.mkdir(f"moments/{model_desc}")
 
     # Setup visualization
     vis = Visualizer(port=opts.vis_port,
@@ -395,6 +420,7 @@ def main():
     
         model = model_map[opts.model](num_classes=opts.num_classes, output_stride=opts.output_stride) 
         
+    model = model.to(device)
     if opts.separable_conv and 'plus' in opts.model:
         network.convert_to_separable_conv(model.classifier)
     if (opts.model != 'pspNet') and (opts.model != 'segNet') and (opts.model != 'FCN8'):
@@ -404,7 +430,7 @@ def main():
     metrics = StreamSegMetrics(opts.num_classes)
 
     # Set up optimizer
-    if opts.model == 'pspNet' or 'segNet' or 'FCN8':
+    if opts.model in ['pspNet', 'segNet', 'FCN8']:
         optimizer = torch.optim.SGD(params=model.parameters(), lr=opts.lr, momentum=0.9, weight_decay=opts.weight_decay) 
 
     elif opts.model == 'resnet-Unet':
@@ -415,13 +441,12 @@ def main():
         
     elif opts.model == 'axial':
         optimizer = torch.optim.Adam(model.parameters(), lr=opts.lr)
-
     else:
         optimizer = torch.optim.SGD(params=[
             {'params': model.backbone.parameters(), 'lr': 0.1*opts.lr},
             {'params': model.classifier.parameters(), 'lr': opts.lr},
         ], lr=opts.lr, momentum=1.0 - opts.alpha, weight_decay=opts.weight_decay)  
-        
+
     #optimizer = torch.optim.SGD(params=model.parameters(), lr=opts.lr, momentum=0.9, weight_decay=opts.weight_decay)
     #torch.optim.lr_scheduler.StepLR(optimizer, step_size=opts.lr_decay_step, gamma=opts.lr_decay_factor)
     # if opts.lr_policy=='poly':
@@ -437,41 +462,32 @@ def main():
     elif opts.loss_type == 'cross_entropy':
         criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
 
-
-    model_desc = generate_unique_name()
-    while os.path.exists(f"moments/{model_desc}"):
-        print("[ERROR] {model_desc} already exists.")
-        model_desc = generate_unique_name()
-    
-    print()
-    print("="*20)
-    print(model_desc)
-    print("="*20)
-    utils.mkdir(f"moments/{model_desc}")
+    if not opts.dev_run:
+        utils.mkdir('checkpoints')
 
     def save_ckpt(path):
         """ save current model
         """
-        torch.save({
-            "cur_itrs": cur_itrs,
-            "model_state": model.module.state_dict(),
-            "optimizer_state": optimizer.state_dict(),
-            "scheduler_state": scheduler.state_dict(),
-            "best_score": best_score,
-        }, path)
-        print("Model saved as %s" % path)
-    
-    utils.mkdir('checkpoints')
+        if not opts.dev_run:
+            torch.save({
+                "cur_itrs": cur_itrs,
+                "model_state": model.state_dict(),
+                "optimizer_state": optimizer.state_dict(),
+                "best_score": best_score,
+            }, path)
 
-    def save_moment(moment_id):
+        print(f"[{not opts.dev_run}] Model saved as {path}")    
+
+    def save_moment(model_desc, model, moment_id):
         """ save moment checkpoint
         """
-        path = f"moments/{model_desc}_{moment_id}.pt"
-        torch.save({
-            "model_state": model.module.state_dict(),
-        }, path)
-        print(f"Model MOMENT {moment_id} saved *")
+        path = f"moments/{model_desc}/{moment_id}.pt"
 
+        if not opts.dev_run:
+            torch.save({
+                "model_state": model.state_dict(),
+            }, path)
+        print(f"[{not opts.dev_run}] Model MOMENT {moment_id} saved")
 
     # bayesian csg-mcmc functions
     def noise_loss(lr):
@@ -483,7 +499,7 @@ def main():
 
         return noise_loss
 
-    def adjust_learning_rate(model, batch_idx, current_epoch):
+    def adjust_learning_rate(model, batch_idx, optim, current_epoch):
         rcounter = (current_epoch) * num_batches + batch_idx
 
         cos_inner = np.pi * (rcounter % (opts.total_itrs // opts.cycles))
@@ -493,8 +509,8 @@ def main():
 
         if opts.alpha < 1.0:
             # decay u-net backbone at same rate, factor 1/10 
-            param_group[0]['lr'] = 0.1*lr
-            param_group[1]['lr'] = lr
+            optim.param_groups[0]['lr'] = 0.1*lr
+            optim.param_groups[1]['lr'] = lr
 
         return lr
 
@@ -548,7 +564,6 @@ def main():
 
         # =====  Train  =====
         model.train()
-        cur_epochs += 1
         moment_count = 0
         for batch_idx, (images, labels) in enumerate(train_loader):
             cur_itrs += 1
@@ -560,17 +575,17 @@ def main():
             outputs = model(images)
             loss = criterion(outputs, labels)
 
-            lr = adjust_learning_rate(batch_idx, cur_epochs)
-            
+            lr = adjust_learning_rate(model, batch_idx, optimizer, cur_epochs)
+
+            wandb.log({"lr": lr, "train_loss": loss})
             if opts.alpha == 1.0:
                 if (cur_epochs % opts.cycle_length) + 1 > (opts.cycle_length - opts.models_per_cycle):
                     loss_noise = noise_loss(lr) * (opts.temperature / train_size)**.5
                     loss += loss_noise
                 loss.backward()
-
             else:  # alpha < 1.0 is HMC
                 loss.backward()
-                update_params(lr, cur_epochs)
+                update_params(model, lr, cur_epochs)
 
             optimizer.step()
 
@@ -579,11 +594,6 @@ def main():
             if vis is not None:
                 vis.vis_scalar('Loss', cur_itrs, np_loss)
 
-            # within sampling phase
-            if (cur_epochs % opts.cycle_length) + 1 > opts.cycle_length - opts.models_per_cycle:
-                save_moment(moment_count)
-                moment_count += 1 
-
             if (cur_itrs) % 10 == 0:
                 interval_loss = interval_loss/10
                 print("Epoch %d, Itrs %d/%d, Loss=%f" %
@@ -591,8 +601,8 @@ def main():
                 interval_loss = 0.0
 
             if (cur_itrs) % opts.val_interval == 0:
-                save_ckpt('checkpoints_polypGen/latest_%s_%s_os%d_%s_%s.pth' %
-                          (opts.model, opts.dataset, opts.output_stride, opts.dataType, opts.backbone))
+                # save_ckpt('checkpoints_polypGen/latest_%s_%s_os%d_%s_%s.pth' %
+                #           (opts.model, opts.dataset, opts.output_stride, opts.dataType, opts.backbone))
                 print("validation...")
                 model.eval()
                 val_score, ret_samples = validate(
@@ -603,11 +613,12 @@ def main():
                     metrics=metrics,
                     ret_samples_ids=vis_sample_id,
                 )
+
                 print(metrics.to_str(val_score))
                 if val_score['Mean IoU'] > best_score:  # save best model
                     best_score = val_score['Mean IoU']
-                    save_ckpt('checkpoints_polypGen/best_%s_%s_os%d_%s_%s.pth' %
-                              (opts.model, opts.dataset,opts.output_stride, opts.dataType, opts.backbone))
+                    # save_ckpt('checkpoints_polypGen/best_%s_%s_os%d_%s_%s.pth' %
+                    #           (opts.model, opts.dataset,opts.output_stride, opts.dataType, opts.backbone))
 
                 if vis is not None:  # visualize validation score and samples
                     vis.vis_scalar("[Val] Overall Acc", cur_itrs, val_score['Overall Acc'])
@@ -624,19 +635,34 @@ def main():
             if scheduler:
                 scheduler.step()  
 
-            if cur_itrs >=  opts.total_itrs:
+            if opts.dev_run: # single itr per epoch only on dev run
                 break
 
-    bay_inference(
-        opts,
-        model,
-        loader,
-        device,
-        metrics,
-        mt_count=moment_count,
-        ret_samples_ids=None,
-        model_desc=model_desc
-    )
+            # my test only
+            if cur_itrs % 30 == 0:
+                break
+
+        cur_epochs += 1
+        # within sampling phase
+        if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):
+            save_moment(model_desc, model, moment_count)
+
+        if cur_epochs > (opts.cycle_length * opts.cycles):
+            break
+
+            
+
+    # to save time let's just rely on the validation performance
+    # bay_inference(
+    #     opts,
+    #     model,
+    #     loader,
+    #     device,
+    #     metrics,
+    #     mt_count=moment_count,
+    #     ret_samples_ids=None,
+    #     model_desc=model_desc
+    # )
         
 if __name__ == '__main__':
     main()

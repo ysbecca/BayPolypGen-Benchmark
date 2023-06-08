@@ -86,7 +86,6 @@ class VOCSegmentation_polypGen2021(data.Dataset):
                  transform=None):
         
         self.root = os.path.expanduser(root)
-
         self.transform = transform
         
         self.image_set = image_set

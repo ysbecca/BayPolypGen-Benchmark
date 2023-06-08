@@ -174,7 +174,7 @@ def mymodel():
 
 def load_moment(moment_id, model, device):
 
-    checkpoint = torch.load(f"moments/{opts.model_desc}_{moment_id}.pt", map_location=device)
+    checkpoint = torch.load(f"moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
     state_dict = checkpoint['model_state']
 
     model.load_state_dict(state_dict)
@@ -239,9 +239,9 @@ if __name__ == '__main__':
         
         # ---> Folder for test data location!!! (Warning!!! do not copy/visulise!!!)
         #imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
-        # imgfolder = '/resstore/b0211/Users/scpecs/datasets/EndoCV2021/data_C6/' + subDirs[j]
+        imgfolder = '/resstore/b0211/Users/scpecs/datasets/EndoCV2021/data_C6/' + subDirs[j]
         
-        imgfolder = '/usr/not-backed-up/BayPolypGen-Benchmark/datasets/EndoCV2021/data_C6/' + subDirs[j]
+        # imgfolder = '/usr/not-backed-up/BayPolypGen-Benchmark/datasets/EndoCV2021/data_C6/' + subDirs[j]
 
         # set folder to save your checkpoints here!
         saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
