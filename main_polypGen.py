@@ -179,21 +179,6 @@ def get_dataset(opts):
         
     return train_dst, val_dst
 
-
-# TODO
-def evaluate():
-    """ perform validation (inference) on validation set sampling from posterior """
-
-    # load moments
-    # pass thru and save...
-
-    # compute mu and epis
-    # save preds and epis...
-
-    # print out metrics
-    print("evaluation TBD")
-    pass
-
 def bay_inference(opts, model, loader, device, metrics, mt_count=0, ret_samples_ids=None, model_desc=None):
     """ Do Bayesian inference from posterior samples and return metrics, preds and epis. """
     metrics.reset()
@@ -243,7 +228,6 @@ def bay_inference(opts, model, loader, device, metrics, mt_count=0, ret_samples_
 
         # TODO check the shape here; need another mean across dims probably!
         print("m_shape.shape", m_shape.shape)
-        exit()
 
         # accumulate epistemic uncertainties
         temp = (m_logits - m_preds.expand((mt_count, *m_preds.shape)))**2
@@ -638,9 +622,6 @@ def main():
             if opts.dev_run: # single itr per epoch only on dev run
                 break
 
-            # my test only
-            if cur_itrs % 30 == 0:
-                break
 
         cur_epochs += 1
         # within sampling phase
