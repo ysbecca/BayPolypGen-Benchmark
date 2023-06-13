@@ -133,6 +133,8 @@ def get_argparser():
     parser.add_argument("--val_interval", type=int, default=100,
                         help="epoch interval for eval (default: 100)")
 
+    parser.add_argument("--log_masks_wandb", default=False,
+                        help="log --vis_num_samples samples during training on wandb")
 
     # Visdom options
     parser.add_argument("--enable_vis", action='store_true', default=False,
@@ -540,7 +542,7 @@ def main():
 
     #==========   Train Loop   ==========#
     vis_sample_id = np.random.randint(0, len(val_loader), opts.vis_num_samples,
-                                      np.int32) if opts.enable_vis else None 
+                                      np.int32) if (opts.enable_vis or opts.log_masks_wandb) else None 
     denorm = utils.Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  
 
     interval_loss = 0
@@ -584,43 +586,46 @@ def main():
                       (cur_epochs, cur_itrs, opts.total_itrs, interval_loss))
                 interval_loss = 0.0
 
-            if (cur_itrs) % opts.val_interval == 0:
+            # TODO add this condition back in!!!!
+            # if (cur_itrs) % opts.val_interval == 0:
                 # save_ckpt('checkpoints_polypGen/latest_%s_%s_os%d_%s_%s.pth' %
                 #           (opts.model, opts.dataset, opts.output_stride, opts.dataType, opts.backbone))
-                print("validation...")
-                model.eval()
-                val_score, ret_samples = validate(
-                    opts=opts,
-                    model=model,
-                    loader=val_loader,
-                    device=device,
-                    metrics=metrics,
-                    ret_samples_ids=vis_sample_id,
-                )
+            print("validation...")
+            model.eval()
+            val_score, ret_samples = validate(
+                opts=opts,
+                model=model,
+                loader=val_loader,
+                device=device,
+                metrics=metrics,
+                ret_samples_ids=vis_sample_id,
+            )
 
-                print(metrics.to_str(val_score))
-                if val_score['Mean IoU'] > best_score:  # save best model
-                    best_score = val_score['Mean IoU']
-                    # save_ckpt('checkpoints_polypGen/best_%s_%s_os%d_%s_%s.pth' %
-                    #           (opts.model, opts.dataset,opts.output_stride, opts.dataType, opts.backbone))
-                wandb.log({"val_mean_iou": val_score['Mean IoU']})
-                if vis is not None:  # visualize validation score and samples
-                    vis.vis_scalar("[Val] Overall Acc", cur_itrs, val_score['Overall Acc'])
-                    vis.vis_scalar("[Val] Mean IoU", cur_itrs, val_score['Mean IoU'])
-                    vis.vis_table("[Val] Class IoU", val_score['Class IoU'])
+            print(metrics.to_str(val_score))
+            if val_score['Mean IoU'] > best_score:  # save best model
+                best_score = val_score['Mean IoU']
+                # save_ckpt('checkpoints_polypGen/best_%s_%s_os%d_%s_%s.pth' %
+                #           (opts.model, opts.dataset,opts.output_stride, opts.dataType, opts.backbone))
+            wandb.log({"val_mean_iou": val_score['Mean IoU']})
+            # if vis is not None:  # visualize validation score and samples
+            #     vis.vis_scalar("[Val] Overall Acc", cur_itrs, val_score['Overall Acc'])
+            #     vis.vis_scalar("[Val] Mean IoU", cur_itrs, val_score['Mean IoU'])
+            #     vis.vis_table("[Val] Class IoU", val_score['Class IoU'])
 
-                    wandb.log({"val_acc": val_score['Overall Acc'], "val_class_iou": val_score['Class IoU']})
+            wandb.log({"val_acc": val_score['Overall Acc'], "val_class_iou": val_score['Class IoU']})
 
-                    samples = []
-                    for k, (img, target, lbl) in enumerate(ret_samples):
-                        img = (denorm(img) * 255).astype(np.uint8)
-                        target = train_dst.decode_target(target).transpose(2, 0, 1).astype(np.uint8)
-                        lbl = train_dst.decode_target(lbl).transpose(2, 0, 1).astype(np.uint8)
-                        concat_img = np.concatenate((img, target, lbl), axis=2)  # concat along width
-                        vis.vis_image('Sample %d' % k, concat_img)
-                        samples.append(concat_img)
-                    wandb.log({"samples": np.array(samples)})
-                model.train()
+            if opts.log_masks_wandb:
+                samples = []
+                for k, (img, target, lbl) in enumerate(ret_samples):
+                    img = (denorm(img) * 255).astype(np.uint8)
+                    target = train_dst.decode_target(target).transpose(2, 0, 1).astype(np.uint8)
+                    lbl = train_dst.decode_target(lbl).transpose(2, 0, 1).astype(np.uint8)
+                    concat_img = np.concatenate((img, target, lbl), axis=2)  # concat along width
+                    # vis.vis_image('Sample %d' % k, concat_img)
+                    samples.append(concat_img)
+                wandb.log({"samples": np.array(samples)})
+
+            model.train()
             if scheduler:
                 scheduler.step()  
 
