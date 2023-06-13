@@ -603,18 +603,23 @@ def main():
                     best_score = val_score['Mean IoU']
                     # save_ckpt('checkpoints_polypGen/best_%s_%s_os%d_%s_%s.pth' %
                     #           (opts.model, opts.dataset,opts.output_stride, opts.dataType, opts.backbone))
-
+                wandb.log({"val_mean_iou": val_score['Mean IoU']})
                 if vis is not None:  # visualize validation score and samples
                     vis.vis_scalar("[Val] Overall Acc", cur_itrs, val_score['Overall Acc'])
                     vis.vis_scalar("[Val] Mean IoU", cur_itrs, val_score['Mean IoU'])
                     vis.vis_table("[Val] Class IoU", val_score['Class IoU'])
 
+                    wandb.log({"val_acc": val_score['Overall Acc'], "val_class_iou": val_score['Class IoU']})
+
+                    samples = []
                     for k, (img, target, lbl) in enumerate(ret_samples):
                         img = (denorm(img) * 255).astype(np.uint8)
                         target = train_dst.decode_target(target).transpose(2, 0, 1).astype(np.uint8)
                         lbl = train_dst.decode_target(lbl).transpose(2, 0, 1).astype(np.uint8)
                         concat_img = np.concatenate((img, target, lbl), axis=2)  # concat along width
                         vis.vis_image('Sample %d' % k, concat_img)
+                        samples.append(concat_img)
+                    wandb.log({"samples": np.array(samples)})
                 model.train()
             if scheduler:
                 scheduler.step()  
