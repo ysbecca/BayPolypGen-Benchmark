@@ -536,7 +536,7 @@ def main():
     best_score = 0.0
     cur_itrs = 0
     cur_epochs = 0
-
+    moment_count = 0
     # TODO rewrite for Bay version
     # if opts.ckpt is not None and os.path.isfile(opts.ckpt):
     #     checkpoint = torch.load(opts.ckpt, map_location=torch.device('cpu'))
@@ -566,7 +566,7 @@ def main():
 
         # =====  Train  =====
         model.train()
-        moment_count = 0
+
         for batch_idx, (images, labels) in enumerate(train_loader):
             cur_itrs += 1
 
@@ -652,6 +652,7 @@ def main():
         # within sampling phase
         if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):
             save_moment(model_desc, model, moment_count)
+            moment_count += 1
 
         if cur_epochs > (opts.cycle_length * opts.cycles):
             break
