@@ -648,15 +648,15 @@ def main():
                 break
 
 
-        cur_epochs += 1
         # within sampling phase
         if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):
             save_moment(model_desc, model, moment_count)
             moment_count += 1
-
+        
         if cur_epochs > (opts.cycle_length * opts.cycles):
             break
-
+        cur_epochs += 1
+        
             
 
     # to save time let's just rely on the validation performance
