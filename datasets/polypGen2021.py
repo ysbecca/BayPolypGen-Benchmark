@@ -83,6 +83,7 @@ class VOCSegmentation_polypGen2021(data.Dataset):
                  root,
                  image_set='train',
                  download=False,
+                 epi_dims=None,
                  transform=None):
         
         self.root = os.path.expanduser(root)
@@ -91,7 +92,7 @@ class VOCSegmentation_polypGen2021(data.Dataset):
         self.image_set = image_set
 
         voc_root = self.root
-        
+
         if image_set=='train':
             # not used!
             mask_dir = os.path.join(voc_root, 'SegmentationClassAug')
@@ -117,6 +118,13 @@ class VOCSegmentation_polypGen2021(data.Dataset):
         self.images = [os.path.join(image_dir, x + ".jpg") for x in file_names]
         self.masks = [os.path.join(mask_dir, x + "_mask.jpg") for x in file_names]
         
+        if epi_dims:
+            self.p_hats = np.ones((epi_dims[0], len(self), epi_dims[1], epi_dims[2], epi_dims[3]))
+        else:
+            self.p_hats = None
+
+        self.track_epi = epi_dims
+
         assert (len(self.images) == len(self.masks))
 
     def __getitem__(self, index):
@@ -136,7 +144,10 @@ class VOCSegmentation_polypGen2021(data.Dataset):
         if self.transform is not None:
             img, target = self.transform(img, target)
 
-        return img, target
+        if self.track_epi:
+            return img, target, index
+        else:
+            return img, target
 
 
     def __len__(self):

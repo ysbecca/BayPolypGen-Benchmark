@@ -6,6 +6,7 @@ import random
 import argparse
 import numpy as np
 
+import torch.nn.functional as F
 from torch.utils import data
 import wandb
 
@@ -49,7 +50,7 @@ def get_argparser():
                         help="use EpiUpWt de-biasing method during training")
     parser.add_argument("--sharpen", type=str, default=False,
                         help="use posterior sharpening method during training")
-    parser.add_argument("--kappa", type=float, default=4.0,
+    parser.add_argument("--kappa", type=float, default=2.0,
                     help="weighting scalar")
     parser.add_argument("--cycle_length", type=int, default=150,
                     help="default cycle length")
@@ -176,7 +177,7 @@ def get_dataset(opts):
             ])
             
     if opts.epiupwt:
-        epi_dims = (opts.models_per_cycle, 2)
+        epi_dims = (opts.models_per_cycle, 2, 512, 512)
     else:
         epi_dims = None 
 
@@ -531,11 +532,24 @@ def main():
             p.data.add_(buf_new)
             p.buf = buf_new
 
+    def standard_loss(outputs, labels, criterion, weights=[], device=None):
+        if len(weights):
+            loss = F.cross_entropy(outputs, labels, reduction="none")
+            adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
+
+            loss *= adj_w
+            return loss.sum() / len(labels)
+        else:
+            return F.cross_entropy(outputs, labels)
+
+    def weighting_function(epistemics):
+        return torch.pow((1.0 + torch.tensor(epistemics)), opts.kappa)
 
     # Restore
     best_score = 0.0
     cur_itrs = 0
     cur_epochs = 0
+    moment_count = 0
 
     # TODO rewrite for Bay version
     # if opts.ckpt is not None and os.path.isfile(opts.ckpt):
@@ -566,8 +580,12 @@ def main():
 
         # =====  Train  =====
         model.train()
-        moment_count = 0
-        for batch_idx, (images, labels) in enumerate(train_loader):
+        for batch in enumerate(train_loader):
+            if opts.epiupwt or opts.sharpen:
+                batch_idx, (images, labels, idxes) = batch
+            else:
+                batch_idx, (images, labels) = batch
+    
             cur_itrs += 1
 
             images = images.to(device, dtype=torch.float32)
@@ -575,11 +593,37 @@ def main():
      
             optimizer.zero_grad()
             outputs = model(images)
-            loss = criterion(outputs, labels)
+ 
+           # ======= Epistemic uncertainties ==========================================
+            epistemics = []
+            weights = np.ones((16))
 
+            if opts.epiupwt and (cur_epochs % opts.cycle_length + 1 == opts.cycle_length):
+                # which index in cycle is this moment
+                moment_id = moment_count % opts.models_per_cycle
+
+                # save in correct indices
+                # [moment_id, idxes, 2, 512, 512]
+                train_dst.p_hats[moment_id][idxes.cpu()] = outputs.detach().cpu().numpy()
+
+            # if not first cycle, use epis for dynamic upweighting
+            if opts.epiupwt and (cur_epochs > opts.cycle_length):
+                # p_bars = y pred, p_hats = p_theta_i(y | x)
+                p_hats = train_dst.p_hats[:, idxes.cpu()]
+                p_bars = p_hats.mean(axis=0)
+
+                temp = (p_hats - np.broadcast_to(p_bars, (opts.models_per_cycle, *p_bars.shape)))**2
+                epistemics = np.sqrt(np.sum(temp, axis=0)) / opts.models_per_cycle
+                # [models per cycle, batch, 2, 512, 512]
+                epistemics = epistemics.astype(np.double)
+                condensed_epis = np.mean(np.max(epistemics, axis=1), axis=(1, 2))
+                weights = weighting_function(condensed_epis)
+
+            # =============== LOSS ======================
+            loss = standard_loss(outputs, labels, criterion, weights, device)
             lr = adjust_learning_rate(model, batch_idx, optimizer, cur_epochs)
-
             wandb.log({"lr": lr, "train_loss": loss})
+
             if opts.alpha == 1.0:
                 if (cur_epochs % opts.cycle_length) + 1 > (opts.cycle_length - opts.models_per_cycle):
                     loss_noise = noise_loss(lr) * (opts.temperature / train_size)**.5
@@ -600,7 +644,7 @@ def main():
                 interval_loss = interval_loss/10
                 print("Epoch %d, Itrs %d/%d, Loss=%f" %
                       (cur_epochs, cur_itrs, opts.total_itrs, interval_loss))
-                interval_loss = 0.0
+                interval_loss = 0.0  
 
             if (cur_itrs) % opts.val_interval == 0:
                 # save_ckpt('checkpoints_polypGen/latest_%s_%s_os%d_%s_%s.pth' %
@@ -647,16 +691,16 @@ def main():
             if opts.dev_run: # single itr per epoch only on dev run
                 break
 
-
-        cur_epochs += 1
         # within sampling phase
         if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):
             save_moment(model_desc, model, moment_count)
+            moment_count += 1
+
+        cur_epochs += 1
 
         if cur_epochs > (opts.cycle_length * opts.cycles):
             break
 
-            
 
     # to save time let's just rely on the validation performance
     # bay_inference(
