@@ -585,7 +585,7 @@ def main():
                 batch_idx, (images, labels, idxes) = batch
             else:
                 batch_idx, (images, labels) = batch
-    
+
             cur_itrs += 1
 
             images = images.to(device, dtype=torch.float32)
@@ -696,11 +696,12 @@ def main():
             save_moment(model_desc, model, moment_count)
             moment_count += 1
 
-        cur_epochs += 1
-
+        
         if cur_epochs > (opts.cycle_length * opts.cycles):
             break
-
+        cur_epochs += 1
+        
+            
 
     # to save time let's just rely on the validation performance
     # bay_inference(
