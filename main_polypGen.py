@@ -182,7 +182,7 @@ def get_dataset(opts):
         epi_dims = None 
 
     train_dst = polyGenSeg(
-        root=opts.root + opts.data_root,
+        root=f"{opts.root}datasets/{opts.data_root}",
         image_set='train_polypGen',
         download=opts.download,
         transform=train_transform,
@@ -190,7 +190,7 @@ def get_dataset(opts):
     )
 
     val_dst = polyGenSeg(
-        root=opts.root + opts.data_root,
+        root=f"{opts.root}datasets/{opts.data_root}",
         image_set='val_polypGen',
         download=False,
         transform=val_transform
@@ -484,7 +484,7 @@ def main():
     def save_moment(model_desc, model, moment_id):
         """ save moment checkpoint
         """
-        path = f"moments/{model_desc}/{moment_id}.pt"
+        path = f"{opts.root}/moments/{model_desc}/{moment_id}.pt"
 
         if not opts.dev_run:
             torch.save({
