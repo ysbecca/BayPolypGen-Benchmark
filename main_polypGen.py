@@ -347,7 +347,7 @@ def main():
         if os.path.exists(f"moments/{model_desc}"):
             print("[ERROR] {model_desc} already exists. Aborting.")
             exit()
-        utils.mkdir(f"moments/{model_desc}")
+        utils.mkdir(f"{opts.root}moments/{model_desc}")
 
     # Setup visualization
     vis = Visualizer(port=opts.vis_port,
@@ -691,6 +691,7 @@ def main():
 
             if opts.dev_run: # single itr per epoch only on dev run
                 break
+            
 
         # within sampling phase
         if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):
