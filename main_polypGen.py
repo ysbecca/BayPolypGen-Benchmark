@@ -596,7 +596,7 @@ def main():
            # ======= Epistemic uncertainties ==========================================
             epistemics = []
 
-            weights = np.ones((opts.batch_size))
+            weights = []
 
             if opts.epiupwt and (cur_epochs % opts.cycle_length + 1 == opts.cycle_length):
                 # which index in cycle is this moment
