@@ -596,7 +596,7 @@ def main():
  
            # ======= Epistemic uncertainties ==========================================
             epistemics = []
-            weights = np.ones((16))
+            weights = np.ones((len(idxes))
 
             if opts.epiupwt and (cur_epochs % opts.cycle_length + 1 == opts.cycle_length):
                 # which index in cycle is this moment
@@ -622,7 +622,8 @@ def main():
             # =============== LOSS ======================
             loss = standard_loss(outputs, labels, criterion, weights, device)
             lr = adjust_learning_rate(model, batch_idx, optimizer, cur_epochs)
-            wandb.log({"lr": lr, "train_loss": loss})
+            if not opts.dev_run:
+                wandb.log({"lr": lr, "train_loss": loss})
 
             if opts.alpha == 1.0:
                 if (cur_epochs % opts.cycle_length) + 1 > (opts.cycle_length - opts.models_per_cycle):
@@ -696,10 +697,10 @@ def main():
             save_moment(model_desc, model, moment_count)
             moment_count += 1
 
+        cur_epochs += 1
         
         if cur_epochs > (opts.cycle_length * opts.cycles):
             break
-        cur_epochs += 1
         
             
 
