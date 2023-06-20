@@ -26,7 +26,6 @@ from skimage.transform import resize
 
 import random
 import string
-from nltk.corpus import words
 
 def plotInference( imgs, depth):
     f =  plt.figure()
@@ -348,7 +347,7 @@ def main():
         if os.path.exists(f"moments/{model_desc}"):
             print("[ERROR] {model_desc} already exists. Aborting.")
             exit()
-        utils.mkdir(f"moments/{model_desc}")
+        utils.mkdir(f"{opts.root}moments/{model_desc}")
 
     # Setup visualization
     vis = Visualizer(port=opts.vis_port,
@@ -596,7 +595,8 @@ def main():
  
            # ======= Epistemic uncertainties ==========================================
             epistemics = []
-            weights = np.ones((len(idxes))
+
+            weights = np.ones((opts.batch_size))
 
             if opts.epiupwt and (cur_epochs % opts.cycle_length + 1 == opts.cycle_length):
                 # which index in cycle is this moment
@@ -666,13 +666,14 @@ def main():
                     best_score = val_score['Mean IoU']
                     # save_ckpt('checkpoints_polypGen/best_%s_%s_os%d_%s_%s.pth' %
                     #           (opts.model, opts.dataset,opts.output_stride, opts.dataType, opts.backbone))
-                wandb.log({"val_mean_iou": val_score['Mean IoU']})
+                if not opts.dev_run:
+                    wandb.log({"val_mean_iou": val_score['Mean IoU']})
                 # if vis is not None:  # visualize validation score and samples
                 #     vis.vis_scalar("[Val] Overall Acc", cur_itrs, val_score['Overall Acc'])
                 #     vis.vis_scalar("[Val] Mean IoU", cur_itrs, val_score['Mean IoU'])
                 #     vis.vis_table("[Val] Class IoU", val_score['Class IoU'])
-
-                wandb.log({"val_acc": val_score['Overall Acc'], "val_class_iou": val_score['Class IoU']})
+                if not opts.dev_run:
+                    wandb.log({"val_acc": val_score['Overall Acc'], "val_class_iou": val_score['Class IoU']})
 
                 if opts.log_masks_wandb:
                     samples = []
@@ -691,14 +692,15 @@ def main():
 
             if opts.dev_run: # single itr per epoch only on dev run
                 break
+            
 
         # within sampling phase
         if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):
             save_moment(model_desc, model, moment_count)
             moment_count += 1
 
-        cur_epochs += 1
-        
+        cur_epochs += 1 
+
         if cur_epochs > (opts.cycle_length * opts.cycles):
             break
         
