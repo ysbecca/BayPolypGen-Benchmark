@@ -483,7 +483,7 @@ def main():
     def save_moment(model_desc, model, moment_id):
         """ save moment checkpoint
         """
-        path = f"{opts.root}moments/{model_desc}/{moment_id}.pt"
+        path = f"{opts.root}/moments/{model_desc}/{moment_id}.pt"
 
         if not opts.dev_run:
             torch.save({
