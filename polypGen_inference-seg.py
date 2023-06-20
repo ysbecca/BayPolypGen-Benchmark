@@ -51,11 +51,12 @@ def get_argparser():
                         help="num classes (default: None)")
 
     # Deeplab Options
-    
-    parser.add_argument("--model", type=str, default='deeplabv3_resnet50',
+    parser.add_argument("--model", type=str, default='deeplabv3plus_resnet50',
                         choices=['deeplabv3_resnet50',  'deeplabv3plus_resnet50',
                                  'deeplabv3_resnet101', 'deeplabv3plus_resnet101',
                                  'deeplabv3_mobilenet', 'deeplabv3plus_mobilenet', 'pspNet', 'segNet', 'FCN8', 'resnet-Unet', 'axial', 'unet'], help='model name')
+    parser.add_argument("--root", type=str, default="",
+                        help='absolute path to EndoCV2021')
 
     parser.add_argument("--model_desc", type=str, default='test',
                         help='model description for loading moments')
@@ -174,7 +175,7 @@ def mymodel():
 
 def load_moment(moment_id, model, device):
 
-    checkpoint = torch.load(f"moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
+    checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
     state_dict = checkpoint['model_state']
 
     model.load_state_dict(state_dict)
@@ -239,7 +240,7 @@ if __name__ == '__main__':
         
         # ---> Folder for test data location!!! (Warning!!! do not copy/visulise!!!)
         #imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
-        imgfolder = '/resstore/b0211/Users/scpecs/datasets/EndoCV2021/data_C6/' + subDirs[j]
+        imgfolder = opts.root + 'datasets/EndoCV2021/data_C6/' + subDirs[j]
         
         # imgfolder = '/usr/not-backed-up/BayPolypGen-Benchmark/datasets/EndoCV2021/data_C6/' + subDirs[j]
 
@@ -305,7 +306,7 @@ if __name__ == '__main__':
             epis_ = epis_.astype(np.double)
 
             # take mean
-            epi = epis_.mean()
+            epi = epis_.max()
             print("epi", epi)
             all_epistemics.append(epi)
 
@@ -321,7 +322,7 @@ if __name__ == '__main__':
 
     all_epistemics = np.array(all_epistemics)
     np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
-
+    print("epis saved. exiting.")
     # file.write('%s -----> %s \n' % 
        # ('average_t', np.mean(timeappend)))
 
