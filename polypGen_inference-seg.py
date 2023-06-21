@@ -71,7 +71,7 @@ def get_argparser():
     
     parser.add_argument("--crop_size", type=int, default=512)
     
-    "Sent as an argument so see the script file instead!!!"
+    # "Sent as an argument so see the script file instead!!!"
     parser.add_argument("--ckpt", type=str, default='./checkpoints/best_deeplabv3plus_resnet50_voc_os16_kvasir.pth',
                         help="checkpoint file")
 
@@ -212,12 +212,7 @@ if __name__ == '__main__':
 #        dirN = 'test_best_endocv2021'+opts.model
 #    else:
 #        dirN = 'test_best_endocv2021'+opts.model+'_'+opts.backbone
-
-    if opts.model != 'resnet-Unet':
-        dirN = 'test_best_endocv2021_dataPaper_'+opts.model
-    else:
-        dirN = 'test_best_endocv2021_dataPaper_'+opts.model+'_'+opts.backbone
-        
+    dirN = opts.model_desc
     directoryName = create_predFolder(dirN)
     
 
@@ -285,12 +280,10 @@ if __name__ == '__main__':
             for m in range(opts.moment_count):
                 model = load_moment(m, model, device)
 
-
                 outputs = model(images.unsqueeze(0))
                 pred = outputs.detach().max(dim=1)[1].cpu().numpy()[0]*255
                 pred = pred.astype(np.uint8)
                 m_preds.append(pred)
-
 
             # end.record()
             # torch.cuda.synchronize()
