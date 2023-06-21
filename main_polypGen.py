@@ -26,7 +26,6 @@ from skimage.transform import resize
 
 import random
 import string
-from nltk.corpus import words
 
 def plotInference( imgs, depth):
     f =  plt.figure()
@@ -348,7 +347,7 @@ def main():
         if os.path.exists(f"moments/{model_desc}"):
             print("[ERROR] {model_desc} already exists. Aborting.")
             exit()
-        utils.mkdir(f"moments/{model_desc}")
+        utils.mkdir(f"{opts.root}moments/{model_desc}")
 
     # Setup visualization
     vis = Visualizer(port=opts.vis_port,
@@ -480,16 +479,17 @@ def main():
             }, path)
 
         print(f"[{not opts.dev_run}] Model saved as {path}")    
-
-    def save_moment(model_desc, model, moment_id):
+    print(f"[INFO] Defined: {model_desc}.")
+    def save_moment(model, moment_id):
         """ save moment checkpoint
         """
-        path = f"{opts.root}/moments/{model_desc}/{moment_id}.pt"
+        path = f"{opts.root}moments/{model_desc}/{moment_id}.pt"
 
         if not opts.dev_run:
             torch.save({
                 "model_state": model.state_dict(),
             }, path)
+            print(path)
         print(f"[{not opts.dev_run}] Model MOMENT {moment_id} saved")
 
     # bayesian csg-mcmc functions
@@ -585,7 +585,7 @@ def main():
                 batch_idx, (images, labels, idxes) = batch
             else:
                 batch_idx, (images, labels) = batch
-    
+
             cur_itrs += 1
 
             images = images.to(device, dtype=torch.float32)
@@ -596,7 +596,8 @@ def main():
  
            # ======= Epistemic uncertainties ==========================================
             epistemics = []
-            weights = np.ones((16))
+
+            weights = []
 
             if opts.epiupwt and (cur_epochs % opts.cycle_length + 1 == opts.cycle_length):
                 # which index in cycle is this moment
@@ -622,7 +623,8 @@ def main():
             # =============== LOSS ======================
             loss = standard_loss(outputs, labels, criterion, weights, device)
             lr = adjust_learning_rate(model, batch_idx, optimizer, cur_epochs)
-            wandb.log({"lr": lr, "train_loss": loss})
+            if not opts.dev_run:
+                wandb.log({"lr": lr, "train_loss": loss})
 
             if opts.alpha == 1.0:
                 if (cur_epochs % opts.cycle_length) + 1 > (opts.cycle_length - opts.models_per_cycle):
@@ -665,13 +667,14 @@ def main():
                     best_score = val_score['Mean IoU']
                     # save_ckpt('checkpoints_polypGen/best_%s_%s_os%d_%s_%s.pth' %
                     #           (opts.model, opts.dataset,opts.output_stride, opts.dataType, opts.backbone))
-                wandb.log({"val_mean_iou": val_score['Mean IoU']})
+                if not opts.dev_run:
+                    wandb.log({"val_mean_iou": val_score['Mean IoU']})
                 # if vis is not None:  # visualize validation score and samples
                 #     vis.vis_scalar("[Val] Overall Acc", cur_itrs, val_score['Overall Acc'])
                 #     vis.vis_scalar("[Val] Mean IoU", cur_itrs, val_score['Mean IoU'])
                 #     vis.vis_table("[Val] Class IoU", val_score['Class IoU'])
-
-                wandb.log({"val_acc": val_score['Overall Acc'], "val_class_iou": val_score['Class IoU']})
+                if not opts.dev_run:
+                    wandb.log({"val_acc": val_score['Overall Acc'], "val_class_iou": val_score['Class IoU']})
 
                 if opts.log_masks_wandb:
                     samples = []
@@ -690,17 +693,20 @@ def main():
 
             if opts.dev_run: # single itr per epoch only on dev run
                 break
+            #if cur_itrs % 10 == 0:
+             #   break
 
         # within sampling phase
         if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):
-            save_moment(model_desc, model, moment_count)
+            save_moment(model, moment_count)
             moment_count += 1
 
-        cur_epochs += 1
+        cur_epochs += 1 
 
         if cur_epochs > (opts.cycle_length * opts.cycles):
             break
-
+        
+            
 
     # to save time let's just rely on the validation performance
     # bay_inference(
