@@ -212,11 +212,7 @@ if __name__ == '__main__':
 #    else:
 #        dirN = 'test_best_endocv2021'+opts.model+'_'+opts.backbone
 
-    if opts.model != 'resnet-Unet':
-        dirN = 'test_best_endocv2021_dataPaper_'+opts.model
-    else:
-        dirN = 'test_best_endocv2021_dataPaper_'+opts.model+'_'+opts.backbone
-        
+    dirN = opts.model_desc 
     directoryName = create_predFolder(dirN)
     
 

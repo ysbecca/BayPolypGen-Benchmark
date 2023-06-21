@@ -482,16 +482,17 @@ def main():
             }, path)
 
         print(f"[{not opts.dev_run}] Model saved as {path}")    
-
-    def save_moment(model_desc, model, moment_id):
+    print(f"[INFO] Defined: {model_desc}.")
+    def save_moment(model, moment_id):
         """ save moment checkpoint
         """
-        path = f"{opts.root}/moments/{model_desc}/{moment_id}.pt"
+        path = f"{opts.root}moments/{model_desc}/{moment_id}.pt"
 
         if not opts.dev_run:
             torch.save({
                 "model_state": model.state_dict(),
             }, path)
+            print(path)
         print(f"[{not opts.dev_run}] Model MOMENT {moment_id} saved")
 
     # bayesian csg-mcmc functions
@@ -695,11 +696,12 @@ def main():
 
             if opts.dev_run: # single itr per epoch only on dev run
                 break
-            
+            #if cur_itrs % 10 == 0:
+             #   break
 
         # within sampling phase
         if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):
-            save_moment(model_desc, model, moment_count)
+            save_moment(model, moment_count)
             moment_count += 1
 
         cur_epochs += 1 
