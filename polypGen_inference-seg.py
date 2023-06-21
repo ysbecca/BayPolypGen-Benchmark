@@ -18,7 +18,7 @@ import skimage
 from skimage import io
 from  tifffile import imsave
 import skimage.transform
-
+from collections import OrderedDict
 import matplotlib.pyplot as plt
 
 def create_predFolder(task_type):
@@ -52,10 +52,12 @@ def get_argparser():
 
     # Deeplab Options
     
-    parser.add_argument("--model", type=str, default='deeplabv3_resnet50',
+    parser.add_argument("--model", type=str, default='deeplabv3plus_resnet50',
                         choices=['deeplabv3_resnet50',  'deeplabv3plus_resnet50',
                                  'deeplabv3_resnet101', 'deeplabv3plus_resnet101',
                                  'deeplabv3_mobilenet', 'deeplabv3plus_mobilenet', 'pspNet', 'segNet', 'FCN8', 'resnet-Unet', 'axial', 'unet'], help='model name')
+    parser.add_argument("--root", type=str, default="",
+                        help='absolute path to EndoCV2021')
 
     parser.add_argument("--model_desc", type=str, default='test',
                         help='model description for loading moments')
@@ -174,10 +176,17 @@ def mymodel():
 
 def load_moment(moment_id, model, device):
 
-    checkpoint = torch.load(f"moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
+    checkpoint = torch.load(f"{opts.root}moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
     state_dict = checkpoint['model_state']
+    new_state_dict = OrderedDict()
+    for k, v in state_dict.items():
+         if 'module' not in k:
+             k = 'module.'+k
+         else:
+             k = k.replace('features.module.', 'module.features.')
+         new_state_dict[k]=v
 
-    model.load_state_dict(state_dict)
+    model.load_state_dict(new_state_dict)
     model.eval()
 
     return model
@@ -235,9 +244,11 @@ if __name__ == '__main__':
         
         # ---> Folder for test data location!!! (Warning!!! do not copy/visulise!!!)
         #imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
-        imgfolder = '/resstore/b0211/Users/scpecs/datasets/EndoCV2021/data_C6/' + subDirs[j]
-        
-        # imgfolder = '/usr/not-backed-up/BayPolypGen-Benchmark/datasets/EndoCV2021/data_C6/' + subDirs[j]
+        if not opts.root:
+            imgfolder = '/resstore/b0211/Users/scpecs/' 
+        else:
+            imgfolder = opts.root
+        imgfolder += f"datasets/EndoCV2021/data_C6/" + subDirs[j]
 
         # set folder to save your checkpoints here!
         saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
@@ -301,8 +312,7 @@ if __name__ == '__main__':
             epis_ = epis_.astype(np.double)
 
             # take mean
-            epi = epis_.mean()
-            print("epi", epi)
+            epi = epis_.max()
             all_epistemics.append(epi)
 
             # final averaged prediction seg map

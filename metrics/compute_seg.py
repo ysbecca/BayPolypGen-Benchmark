@@ -74,6 +74,16 @@ def get_args():
     parser.add_argument("--GT_maskDIR", type=str, default="/media/sharib/development/EndoCV2021-test_analysis/codes-seg/EndoCV2021_groundTruth-v1/segmentation/EndoCV_DATA3_GT", help="ground truth mask image (5 channel tif image only)")
     parser.add_argument("--Eval_maskDIR", type=str, default="/media/sharib/development/EndoCV2021-test_analysis/codes-seg/EndoCV2021/segmentation/EndoCV_DATA3_pred", help="provide folder for testType1 dataset under that name")
     parser.add_argument("--jsonFileName", type=str, default="metric_seg_score.json", help="all evaluation scores used for grading")
+
+    parser.add_argument("--root", type=str, default="",
+                        help='absolute path to EndoCV2021')
+
+    parser.add_argument("--model_desc", type=str, default='test',
+                        help='model description for loading moments')
+
+    # Peter: the results will be in {args.root}/EndoCV2021/{args.model_desc}/segmentation/...
+    # in wandb.init dict set "name": args.model_desc
+
     args = parser.parse_args()
     return args
 
