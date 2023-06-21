@@ -693,8 +693,8 @@ def main():
 
             if opts.dev_run: # single itr per epoch only on dev run
                 break
-            if cur_itrs % 10 == 0:
-                break
+            #if cur_itrs % 10 == 0:
+             #   break
 
         # within sampling phase
         if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):
