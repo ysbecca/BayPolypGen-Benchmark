@@ -248,7 +248,7 @@ if __name__ == '__main__':
             imgfolder = '/resstore/b0211/Users/scpecs/' 
         else:
             imgfolder = opts.root
-        imgfolder += "datasets/EndoCV2021/data_C6/" + subDirs[j]
+        imgfolder += f"datasets/EndoCV2021/data_C6/" + subDirs[j]
 
         # set folder to save your checkpoints here!
         saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
