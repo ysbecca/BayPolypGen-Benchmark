@@ -71,7 +71,7 @@ def roi_area(mask):
 def get_args():
     import argparse
     parser = argparse.ArgumentParser(description="Semantic segmentation of EndoCV2021 challenge", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--GT_maskDIR", type=str, default="/media/sharib/development/EndoCV2021-test_analysis/codes-seg/EndoCV2021_groundTruth-v1/segmentation/EndoCV_DATA3_GT", help="ground truth mask image (5 channel tif image only)")
+    parser.add_argument("--GT_maskDIR", type=str, default="datasets/EndoCV2021/data_C6/masks_C6", help="ground truth mask image (5 channel tif image only)")
     parser.add_argument("--Eval_maskDIR", type=str, default="/media/sharib/development/EndoCV2021-test_analysis/codes-seg/EndoCV2021/segmentation/EndoCV_DATA3_pred", help="provide folder for testType1 dataset under that name")
     parser.add_argument("--jsonFileName", type=str, default="metric_seg_score.json", help="all evaluation scores used for grading")
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     
     # can be multiple test sets: 1 -- 5
     # ground truth folder
-    GT_folder = args.GT_maskDIR
+    GT_folder = args.root + args.GT_maskDIR
     GT_files = glob.glob(os.path.join(GT_folder,'*.jpg'))
     
     # evaluation/predicted folder
