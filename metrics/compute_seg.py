@@ -327,7 +327,7 @@ if __name__ == '__main__':
         }   
                 
         wandb.log({
-          "dice": dice_score.mean(axis=0)[0], "dice_std": np.std(dice_scores),
+          "dice": dice_scores.mean(axis=0)[0], "dice_std": np.std(dice_scores),
           "jaccard": jac_scores.mean(axis=0)[0], "jc_std": np.std(jac_scores),
           "f2": f2_scores.mean(axis=0)[0], "f2_std": np.std(f2_scores),
           "PPV": PPV_scores.mean(axis=0)[0], "PPV_std": np.std(PPV_scores),
@@ -341,6 +341,3 @@ if __name__ == '__main__':
         jsonFileName=args.jsonFileName
         # EndoCV_misc.write2json(jsonFileName, my_dictionary)
         
-    
-
-
