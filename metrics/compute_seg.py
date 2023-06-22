@@ -91,7 +91,7 @@ def get_args():
 if __name__ == '__main__':
     import glob
     import os
-    from misc import EndoCV_misc 
+    # from misc import EndoCV_misc 
     import cv2
     from metrics_seg import get_confusion_matrix_elements, jac_score, dice_score, F2, precision, recall, get_confusion_matrix_torch
     import time
@@ -339,7 +339,7 @@ if __name__ == '__main__':
         
         # write to json      
         jsonFileName=args.jsonFileName
-        EndoCV_misc.write2json(jsonFileName, my_dictionary)
+        # EndoCV_misc.write2json(jsonFileName, my_dictionary)
         
     
 
