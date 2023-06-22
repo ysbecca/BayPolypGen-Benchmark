@@ -21,15 +21,13 @@ import skimage.transform
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 
-def create_predFolder(task_type):
-    directoryName = 'EndoCV2021'
-    if not os.path.exists(directoryName):
-        os.mkdir(directoryName)
+def create_predFolder(root, model_desc):
+    path = f"{root}predictions/images_C6_pred/{model_desc}/"
+    print(path)
+    if not os.path.exists(path):
+        os.mkdir(path)
         
-    if not os.path.exists(os.path.join(directoryName, task_type)):
-        os.mkdir(os.path.join(directoryName, task_type))
-        
-    return os.path.join(directoryName, task_type)
+    return path
 
 def detect_imgs(infolder, ext='.tif'):
     import os
@@ -220,14 +218,8 @@ if __name__ == '__main__':
 #        dirN = 'test_best_endocv2021'+opts.model
 #    else:
 #        dirN = 'test_best_endocv2021'+opts.model+'_'+opts.backbone
-
-    dirN = opts.model_desc 
-    directoryName = create_predFolder(dirN)
-    
-
-    task_type = './'+ dirN + '/' + 'segmentation'
-    # set image folder here!
-    directoryName = create_predFolder(task_type)
+    # set image folder here! ./frosty/segmentation
+    saveDir = create_predFolder(opts.root, opts.model_desc)
     
     # ----> three test folders [https://github.com/sharibox/EndoCV2021-polyp_det_seg_gen/wiki/EndoCV2021-Leaderboard-guide]
     
@@ -250,11 +242,9 @@ if __name__ == '__main__':
             imgfolder = opts.root
         imgfolder += f"datasets/EndoCV2021/data_C6/" + subDirs[j]
 
-        # set folder to save your checkpoints here!
-        saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
-    
-        if not os.path.exists(saveDir):
-            os.mkdir(saveDir)
+        # # set folder to save your checkpoints here!
+        # saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
+=
 
         imgfiles = detect_imgs(imgfolder, ext='.jpg')
     
