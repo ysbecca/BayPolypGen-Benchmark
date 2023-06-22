@@ -99,8 +99,6 @@ def get_argparser():
     parser.add_argument("--save_val_results", action='store_true', default=True,
                         help="save segmentation results to \"./results_polypGen\"")
     
-    parser.add_argument("--total_itrs", type=int, default=30e3, # not used for bay numbers
-                        help="epoch number (default: 30k)")
     parser.add_argument("--lr", type=float, default=0.01,
                         help="learning rate (default: 0.01)")
     parser.add_argument("--lr_policy", type=str, default='poly', choices=['poly', 'step'],
@@ -502,11 +500,14 @@ def main():
 
         return noise_loss
 
+    total_itrs = opts.cycle_length * num_batches
+    print(f"[INFO] total itrs {total_itrs}")
+
     def adjust_learning_rate(model, batch_idx, optim, current_epoch):
         rcounter = (current_epoch) * num_batches + batch_idx
 
-        cos_inner = np.pi * (rcounter % (opts.total_itrs // opts.cycles))
-        cos_inner /= opts.total_itrs // opts.cycles
+        cos_inner = np.pi * (rcounter % (total_itrs // opts.cycles))
+        cos_inner /= total_itrs // opts.cycles
         cos_out = np.cos(cos_inner) + 1
         lr = 0.5 * cos_out * opts.lr
 
@@ -645,7 +646,7 @@ def main():
             if (cur_itrs) % 10 == 0:
                 interval_loss = interval_loss/10
                 print("Epoch %d, Itrs %d/%d, Loss=%f" %
-                      (cur_epochs, cur_itrs, opts.total_itrs, interval_loss))
+                      (cur_epochs, cur_itrs, total_itrs, interval_loss))
                 interval_loss = 0.0  
 
             if (cur_itrs) % opts.val_interval == 0:
@@ -693,8 +694,8 @@ def main():
 
             if opts.dev_run: # single itr per epoch only on dev run
                 break
-            #if cur_itrs % 10 == 0:
-             #   break
+            if cur_itrs % 10 == 0:
+               break
 
         # within sampling phase
         if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):
