@@ -29,7 +29,7 @@ for model in "${MODELS[@]}"
 do
 	if [ $task_id = $SLURM_ARRAY_TASK_ID ]
 	then
-		python main_polypGen.py \
+		python polypGen_inference-seg.py \
 			--moment_count 10 \
 			--model_desc $model \
 			--root $ROOT
