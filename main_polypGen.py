@@ -27,6 +27,9 @@ from skimage.transform import resize
 import random
 import string
 
+import warnings
+warnings.filterwarnings("ignore")
+
 def plotInference( imgs, depth):
     f =  plt.figure()
     f.add_subplot(1,2, 1)
