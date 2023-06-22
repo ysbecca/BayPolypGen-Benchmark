@@ -108,12 +108,6 @@ if __name__ == '__main__':
      project = "inference",
      config  = {
       "name": args.model_desc,
-      "alpha": args.alpha,
-      "cycle_length": args.cycle_length,
-      "cycles": args.cycles,
-      "kappa": args.kappa,
-      "learning_rate": args.learning_rate,
-      "models_per_cycle": args.models_per_cycle,
      }
     )
     
