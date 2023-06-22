@@ -117,7 +117,7 @@ if __name__ == '__main__':
     GT_files = glob.glob(os.path.join(GT_folder,'*.jpg'))
     
     # evaluation/predicted folder
-    participantsFolder = "{}/EndoCV2021/{}/segmentation".format(args.root, args.model_desc) #args.Eval_maskDIR
+    participantsFolder = "{}/predictions/images_C6_pred/{}".format(args.root, args.model_desc) #args.Eval_maskDIR
     
     # save folder
 #    savefolder = 'semantic_results'
