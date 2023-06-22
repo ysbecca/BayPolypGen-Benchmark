@@ -81,6 +81,7 @@ def get_args():
     parser.add_argument("--model_desc", type=str, default='test',
                         help='model description for loading moments')
 
+    parser.add_argument("--dev_run", type=bool, default=False)
     # Peter: the results will be in {args.root}/EndoCV2021/{args.model_desc}/segmentation/...
     # in wandb.init dict set "name": args.model_desc
 
@@ -104,12 +105,13 @@ if __name__ == '__main__':
     args = get_args()
 
 # Are we using all the hyperparameters or just the name?
-    wandb.init(
-     project = "inference",
-     config  = {
-      "name": args.model_desc,
-     }
-    )
+    if not args.dev_run:
+        wandb.init(
+            project = "inference",
+            config  = {
+            "name": args.model_desc,
+             }
+        )
     
     # can be multiple test sets: 1 -- 5
     # ground truth folder
@@ -117,8 +119,10 @@ if __name__ == '__main__':
     GT_files = glob.glob(os.path.join(GT_folder,'*.jpg'))
     
     # evaluation/predicted folder
-    participantsFolder = "{}/EndoCV2021/{}/segmentation".format(args.root, args.model_desc) #args.Eval_maskDIR
-    
+    participantsFolder = "{}EndoCV2021/{}/segmentation".format(args.root, args.model_desc) #args.Eval_maskDIR
+    print(GT_folder)
+    print(participantsFolder)
+    exit()
     # save folder
 #    savefolder = 'semantic_results'
 #    os.makedirs(savefolder, exist_ok=True)
@@ -325,17 +329,17 @@ if __name__ == '__main__':
                     }, 
                 }
         }   
-                
-        wandb.log({
-          "dice": dice_score.mean(axis=0)[0], "dice_std": np.std(dice_scores),
-          "jaccard": jac_scores.mean(axis=0)[0], "jc_std": np.std(jac_scores),
-          "f2": f2_scores.mean(axis=0)[0], "f2_std": np.std(f2_scores),
-          "PPV": PPV_scores.mean(axis=0)[0], "PPV_std": np.std(PPV_scores),
-          "recall": Rec_scores.mean(axis=0)[0], "recall_std": np.std(Rec_scores),
-          "OverallAcc": np.mean(acc_scores), "acc_std": np.std(acc_scores)
-        })
+        if not args.dev_run:        
+            wandb.log({
+                "dice": dice_score.mean(axis=0)[0], "dice_std": np.std(dice_scores),
+                "jaccard": jac_scores.mean(axis=0)[0], "jc_std": np.std(jac_scores),
+                "f2": f2_scores.mean(axis=0)[0], "f2_std": np.std(f2_scores),
+                "PPV": PPV_scores.mean(axis=0)[0], "PPV_std": np.std(PPV_scores),
+                "recall": Rec_scores.mean(axis=0)[0], "recall_std": np.std(Rec_scores),
+                 "OverallAcc": np.mean(acc_scores), "acc_std": np.std(acc_scores)
+            })
 
-        wandb.finish()
+            wandb.finish()
         
         # write to json      
         jsonFileName=args.jsonFileName
