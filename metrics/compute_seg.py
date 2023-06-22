@@ -119,10 +119,9 @@ if __name__ == '__main__':
     GT_files = glob.glob(os.path.join(GT_folder,'*.jpg'))
     
     # evaluation/predicted folder
-    participantsFolder = "{}EndoCV2021/{}/segmentation".format(args.root, args.model_desc) #args.Eval_maskDIR
-    print(GT_folder)
-    print(participantsFolder)
-    exit()
+    participantsFolder = "{}/predictions/images_C6_pred/{}".format(args.root, args.model_desc) #args.Eval_maskDIR
+    #print(GT_folder)
+    #print(participantsFolder)
     # save folder
 #    savefolder = 'semantic_results'
 #    os.makedirs(savefolder, exist_ok=True)
@@ -136,7 +135,7 @@ if __name__ == '__main__':
     fnames.append(pred_mask_files)
         
     print('running endocv segmentation...')
-    print(pred_mask_files)
+    #print(pred_mask_files)
     if len(pred_mask_files) > 0:
         gt_mask_files = np.hstack([os.path.join(GT_folder, (os.path.split(f)[-1].split('.')[0])+'.jpg') for f in pred_mask_files])
         
