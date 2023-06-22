@@ -95,12 +95,27 @@ if __name__ == '__main__':
     import cv2
     from metrics_seg import get_confusion_matrix_elements, jac_score, dice_score, F2, precision, recall, get_confusion_matrix_torch
     import time
+    import wandb
     
     # ---> requires: !pip install hausdorff (first install !pip install numba==0.49.1)
     # from hausdorff import hausdorff_distance
 
     classTypes=['polyp']
     args = get_args()
+
+# Are we using all the hyperparameters or just the name?
+    wandb.init(
+     project = "inference",
+     config  = {
+      "name": args.model_desc,
+      "alpha": args.alpha,
+      "cycle_length": args.cycle_length,
+      "cycles": args.cycles,
+      "kappa": args.kappa,
+      "learning_rate": args.learning_rate,
+      "models_per_cycle": args.models_per_cycle,
+     }
+    )
     
     # can be multiple test sets: 1 -- 5
     # ground truth folder
@@ -108,7 +123,7 @@ if __name__ == '__main__':
     GT_files = glob.glob(os.path.join(GT_folder,'*.jpg'))
     
     # evaluation/predicted folder
-    participantsFolder = args.Eval_maskDIR
+    participantsFolder = "{}/EndoCV2021/{}/segmentation".format(args.root, args.model_desc) #args.Eval_maskDIR
     
     # save folder
 #    savefolder = 'semantic_results'
@@ -317,6 +332,16 @@ if __name__ == '__main__':
                 }
         }   
                 
+        wandb.log({
+          "dice": dice_score.mean(axis=0)[0], "dice_std": np.std(dice_scores),
+          "jaccard": jac_scores.mean(axis=0)[0], "jc_std": np.std(jac_scores),
+          "f2": f2_scores.mean(axis=0)[0], "f2_std": np.std(f2_scores),
+          "PPV": PPV_scores.mean(axis=0)[0], "PPV_std": np.std(PPV_scores),
+          "recall": Rec_scores.mean(axis=0)[0], "recall_std": np.std(Rec_scores),
+          "OverallAcc": np.mean(acc_scores), "acc_std": np.std(acc_scores)
+        })
+
+        wandb.finish()
         
         # write to json      
         jsonFileName=args.jsonFileName
