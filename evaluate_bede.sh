@@ -14,8 +14,7 @@ conda activate pyvis
 export WANDB_MODE=online
 
 # TODO 1: fill in the MODELS list with all the string model descs you want to evaluate
-MODELS=("driven-sun-53" \
-	"legendary-moon-51" \
+MODELS=("legendary-moon-51" \
 	"lively-moon-53" \
 	"dainty-smoke-55" \
 	"rosy-sun-49" \
@@ -42,7 +41,7 @@ do
 			--root $ROOT
 
 		# this logs test metrics to wandb
-		python compute_seg.py \
+		python metrics/compute_seg.py \
 			--model_desc $model \
 			--root $ROOT
 
@@ -52,3 +51,6 @@ do
 	fi
 	let $task_id=task_id+1
 done
+
+# python polypGen_inference-seg.py --moment_count 7 --model_desc "driven-sun-53" --root /users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/
+# python metrics/compute_seg.py --model_desc "driven-sun-53" --root /users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/
