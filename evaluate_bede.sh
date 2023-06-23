@@ -4,7 +4,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-
+#SBATCH --array=0-7
 
 module load cuda
 
@@ -14,7 +14,15 @@ conda activate pyvis
 export WANDB_MODE=online
 
 # TODO 1: fill in the MODELS list with all the string model descs you want to evaluate
-MODELS=()
+MODELS=("driven-sun-53" \
+	"legendary-moon-51" \
+	"lively-moon-53" \
+	"dainty-smoke-55" \
+	"rosy-sun-49" \
+	"clear-puddle-40" \
+	"rosy-dragon-50" \
+	"vivid-sky-52" \
+)
 
 # TODO 2: fill in these paths
 export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
