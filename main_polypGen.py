@@ -14,6 +14,7 @@ from datasets import VOCSegmentation_polypGen2021 as polyGenSeg
 
 from utils import ext_transforms as et
 from metrics import StreamSegMetrics
+from metrics.metrics_seg import dice_score
 
 import torch
 import torch.nn as nn
@@ -272,7 +273,8 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
         denorm = utils.Denormalize(mean=[0.485, 0.456, 0.406], 
                                    std=[0.229, 0.224, 0.225])
         img_id = 0
-
+    dice_scores = []
+    loss = 0.0
     with torch.no_grad():
         for i, (images, labels) in tqdm(enumerate(loader)):
             
@@ -280,9 +282,15 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
             labels = labels.to(device, dtype=torch.long)
 
             outputs = model(images)
+            loss += F.cross_entropy(outputs, labels)
+
             preds = outputs.detach().max(dim=1)[1].cpu().numpy()
             targets = labels.cpu().numpy()
-            
+
+
+            for ii in range(len(targets)):
+                dice_scores.append(np.hstack([dice_score(targets[ii], preds[ii])]))
+
             metrics.update(targets, preds)
             if ret_samples_ids is not None and i in ret_samples_ids:  # get vis samples
                 ret_samples.append(
@@ -314,7 +322,11 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
                     img_id += 1
 
         score = metrics.get_results()
-    return score, ret_samples
+        dice_scores = np.vstack(dice_scores)
+        dice = dice_scores.mean(axis=0)[0]
+        loss /= len(loader.dataset)
+        print('CE loss: ', loss, '\nVal samples: ', len(loader.dataset))
+    return score, ret_samples, dice, loss
 
 
 def main():
@@ -663,7 +675,7 @@ def main():
                 #           (opts.model, opts.dataset, opts.output_stride, opts.dataType, opts.backbone))
                 print("validation...")
                 model.eval()
-                val_score, ret_samples = validate(
+                val_score, ret_samples, dsc, val_loss = validate(
                     opts=opts,
                     model=model,
                     loader=val_loader,
@@ -679,13 +691,15 @@ def main():
                     #           (opts.model, opts.dataset,opts.output_stride, opts.dataType, opts.backbone))
                 if not opts.dev_run:
                     wandb.log({"val_mean_iou": val_score['Mean IoU']})
+                    wandb.log({"dice_score": dsc})
+                    wandb.log({"val_loss": val_loss})
                 # if vis is not None:  # visualize validation score and samples
                 #     vis.vis_scalar("[Val] Overall Acc", cur_itrs, val_score['Overall Acc'])
                 #     vis.vis_scalar("[Val] Mean IoU", cur_itrs, val_score['Mean IoU'])
                 #     vis.vis_table("[Val] Class IoU", val_score['Class IoU'])
                 if not opts.dev_run:
                     wandb.log({"val_acc": val_score['Overall Acc'], "val_class_iou": val_score['Class IoU']})
-
+                print('Val DSC: ', dsc)
                 if opts.log_masks_wandb:
                     samples = []
                     for k, (img, target, lbl) in enumerate(ret_samples):
