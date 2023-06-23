@@ -46,7 +46,9 @@ def get_argparser():
 
     parser.add_argument("--dev_run", type=bool, default=False,
                         help='does not save checkpoints or log metrics when in dev mode')
-
+    # only for debiasing
+    parser.add_argument("--model_desc", type=str, default=None,
+                        help='model desc for baseline bay model, only for debiasing methods')
     # debiasing options
     parser.add_argument("--epiupwt", type=str, default=False,
                         help="use EpiUpWt de-biasing method during training")
@@ -323,17 +325,21 @@ def main():
     if opts.dataset.lower() == 'voc':
         opts.num_classes = 2 # foreground + background
 
-    model_desc = "test"
+    model_desc = ""
+    name = None
     if not opts.dev_run:        
         project_name = "baybaseline"
         if opts.epiupwt:
             project_name = "epiupwt"
+            name = opts.model_desc + "_epiupwt"
         elif opts.sharpen:
             project_name = "sharpen"
+            name = opts.model_desc + "_sharpen"
 
         wandb.init(
             project=project_name,
             config={
+                "name": name,
                 "learning_rate": opts.lr,
                 "cycle_length": opts.cycle_length,
                 "cycles": opts.cycles,
