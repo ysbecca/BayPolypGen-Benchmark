@@ -14,13 +14,11 @@ conda activate pyvis
 export WANDB_MODE=online
 
 # TODO 1: fill in the MODELS list with all the string model descs you want to evaluate
-MODELS=("legendary-moon-51" \
-	"lively-moon-53" \
-	"dainty-smoke-55" \
-	"rosy-sun-49" \
-	"clear-puddle-40" \
-	"rosy-dragon-50" \
-	"vivid-sky-52" \
+MODELS=("stellar-deluge-24" \
+	"smart-haze-24" \
+	"hearty-grass-22" \
+	"expert-moon-23" \
+	"olive-lion-21" \
 )
 
 # TODO 2: fill in these paths
@@ -36,7 +34,7 @@ do
 	if [ $task_id = $SLURM_ARRAY_TASK_ID ]
 	then
 		python polypGen_inference-seg.py \
-			--moment_count 10 \
+			--moment_count 6 \
 			--model_desc $model \
 			--root $ROOT
 
