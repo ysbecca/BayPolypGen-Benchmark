@@ -4,7 +4,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-3
+#SBATCH --array=0-2
 
 
 
@@ -18,10 +18,10 @@ export WANDB_MODE=online
 export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 
 
-KAPPAS=(2 5 7 10)
+KAPPAS=(2 5 7)
 task_id=0
 
-BASELINE_MODEL_DESC="driven-sun-53"
+BASELINE_MODEL_DESC="lively-moon-53"
 
 for k in "${KAPPAS[@]}"
 do
@@ -30,11 +30,11 @@ do
 		# TODO fill in params of best baseline bayesian model
 		python main_polypGen.py \
 			--cycle_length 550 \
-			--cycles 2 \
+			--cycles 1 \
 			--epiupwt True \
-			--alpha 0.8 \
+			--alpha 0.9 \
 			--kappa $k \
-			--models_per_cycle 6 \
+			--models_per_cycle 10 \
 			--model_desc $BASELINE_MODEL_DESC \
 			--model "deeplabv3plus_resnet50" \
 			--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/" \
