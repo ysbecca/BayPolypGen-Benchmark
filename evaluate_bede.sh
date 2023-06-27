@@ -4,7 +4,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-7
+#SBATCH --array=1-4
 
 module load cuda
 
@@ -47,7 +47,7 @@ do
 		echo $model
 		exit 0
 	fi
-	let $task_id=task_id+1
+	let task_id=$task_id+1
 done
 
 # python polypGen_inference-seg.py --moment_count 7 --model_desc "driven-sun-53" --root /users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/
