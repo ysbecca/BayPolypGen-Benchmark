@@ -84,7 +84,8 @@ class VOCSegmentation_polypGen2021(data.Dataset):
                  image_set='train',
                  download=False,
                  epi_dims=None,
-                 transform=None):
+                 transform=None,
+                 min_c6=False):
         
         self.root = os.path.expanduser(root)
         self.transform = transform
@@ -117,6 +118,20 @@ class VOCSegmentation_polypGen2021(data.Dataset):
         mask_dir = os.path.join(self.root, 'masks_polypGen')
         self.images = [os.path.join(image_dir, x + ".jpg") for x in file_names]
         self.masks = [os.path.join(mask_dir, x + "_mask.jpg") for x in file_names]
+
+
+        # if min_c6:
+        #     # read text file
+        #     min_c6_path = os.path.join(splits_dir, min_c6 + '.txt')
+        #     with open(os.path.join(min_c6_path), "r") as f:
+        #         file_names = [x.strip() for x in f.readlines()]
+
+            # TODO set mask and image dirs
+            # add those images and masks from file_names to the class variables
+
+            # TODO add flag in the main for training....
+            # TODO save train set uncertainties after first sampling phase
+
         
         if epi_dims:
             self.p_hats = np.ones((epi_dims[0], len(self), epi_dims[1], epi_dims[2], epi_dims[3]))

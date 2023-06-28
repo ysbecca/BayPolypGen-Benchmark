@@ -25,6 +25,8 @@ from PIL import Image
 import matplotlib
 import matplotlib.pyplot as plt
 from skimage.transform import resize
+from collections import OrderedDict
+
 
 import random
 import string
@@ -146,7 +148,6 @@ def get_argparser():
     parser.add_argument("--vis_num_samples", type=int, default=8,
                         help='number of samples for visualization (default: 8)')
     return parser
-
 
 def get_dataset(opts):
     """ Dataset And Augmentation
@@ -286,7 +287,7 @@ def main():
 
     # Setup visualization
     # vis = Visualizer(port=opts.vis_port,
-                     env=opts.vis_env) if opts.enable_vis else None
+                     # env=opts.vis_env) if opts.enable_vis else None
     # if vis is not None:  # display options
         # vis.vis_table("Options", vars(opts))
 
@@ -306,9 +307,9 @@ def main():
     train_dst, val_dst = get_dataset(opts)
     
     train_loader = data.DataLoader(
-        train_dst, batch_size=opts.batch_size, shuffle=True, num_workers=2)
+        train_dst, batch_size=opts.batch_size, shuffle=False, num_workers=2)
     val_loader = data.DataLoader(
-        val_dst, batch_size=opts.val_batch_size, shuffle=True, num_workers=2)
+        val_dst, batch_size=opts.val_batch_size, shuffle=False, num_workers=2)
     print("Dataset: %s, Train set: %d, Val set: %d" %
           (opts.dataset, len(train_dst), len(val_dst)))
 
@@ -388,6 +389,8 @@ def main():
             ], lr=opts.lr, momentum=1.0 - opts.alpha, weight_decay=opts.weight_decay)  
         return optimizer
 
+    def weighting_function(epis):
+        return torch.pow((1.0 + epis), opts.kappa)
 
     optims = [get_optimizers() for m in range(opts.moment_count)]
     if opts.loss_type == "pcgrad":
@@ -448,6 +451,66 @@ def main():
     def weighting_function(epistemics):
         return torch.pow((1.0 + torch.tensor(epistemics)), opts.kappa)
 
+
+    def load_moment(moment_id, model, device):
+
+        checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
+        state_dict = checkpoint['model_state']
+        
+        try:
+            model.load_state_dict(state_dict)
+        except:
+            new_state_dict = OrderedDict()
+            for k, v in state_dict.items():
+                if 'module' not in k:
+                    k = 'module.'+k
+                else:
+                    k = k.replace('features.module.', 'module.features.')
+                new_state_dict[k]=v
+            model.load_state_dict(new_state_dict)
+        model.eval()
+        return model
+
+    def predict_full_posterior(models, loader):
+
+        m_logits = []
+        true_targets = np.zeroes(1159, 512, 512)
+
+        for batch in enumerate(loader):
+            _, (_, targets, idxes) = batch
+            true_targets[idxes] = targets
+
+        for model_idx, m in enumerate(models):
+            m_preds = []
+            for batch in enumerate(loader):
+                batch_idx, (images, labels, idxes) = batch
+
+                outputs = model(images)
+                preds_batch = outputs.detach().max(dim=1)[1].cpu().numpy()[0]*255
+                preds_batch = preds_batch.astype(np.uint8)
+                m_preds.append(preds_batch)
+
+            m_logits.append(np.concatenate(m_preds))
+
+        # [N_MOMENTS, N_SAMPLES, 512, 512]
+        m_logits = np.array(m_logits)
+        print("m_logits.shape", m_logits.shape)
+
+        # [N_SAMPLES, 512, 512]
+        m_preds = np.mean(m_logits, axis=0)
+
+        temp = (m_logits - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
+        epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
+        epis_ = epis_.astype(np.double)
+
+        # [N_SAMPLES, 512, 512]
+        print("epis_.shape before collapse", epis_.shape)
+        # take max or mean?
+        epis = epis_.mean(axis=(1, 2))
+        print("epis.shape", epis_.shape)
+
+        return m_preds, epis
+
     # Restore
     best_score = 0.0
     cur_itrs = 0
@@ -480,32 +543,32 @@ def main():
 
 
     interval_loss = 0
+
+
+    # assumes unshuffled set! only once on train
+    mean_preds, epis = predict_full_posterior(models, train_loader)
+    weights = weighting_function(epis)
+
+    train_loader = data.DataLoader(
+        train_dst, batch_size=opts.batch_size, shuffle=True, num_workers=2)
+    
     for e in range(opts.max_epochs):
-
-        # =====  Sharpen all moments  =====
-        
-        # TODO fetch all mean_preds and epis on train set - only once
-        mean_preds, epis = predict_full_posterior()
-        # TODO compute sample weights - once
-        weights = None
-
         for model_idx, m in enumerate(models):
-
-            model = m.to(device)
-            # TODO load checkpoint
+            model = load_moment(moment_id, model.to(device), device)
 
             model.train()
             for batch in enumerate(train_loader):
                 batch_idx, (images, labels, idxes) = batch
-                # TODO assign
                 mean_preds_batch = mean_preds[idxes]
+                weights_batch = weights[idxes]
 
                 images = images.to(device, dtype=torch.float32)
                 labels = labels.to(device, dtype=torch.long)
      
-                optims[model_idex].zero_grad()
-                outputs = model(images)
-     
+                optims[model_idx].zero_grad()
+                outputs = m(images)
+        
+                # TODO got to here....
                 # =============== LOSS ======================
                 std_loss = standard_loss(outputs, labels, criterion, weights, device)
                 sharpen_loss = standard_loss(outputs, mean_preds_batch, weights, device)
