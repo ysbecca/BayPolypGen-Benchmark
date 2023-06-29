@@ -81,6 +81,9 @@ def get_args():
     parser.add_argument("--model_desc", type=str, default='test',
                         help='model description for loading moments')
 
+    parser.add_argument("--test_set", type=str, default='C6_pred',
+                        help='EndoCV_DATA3, EndoCV_DATA4')
+
     # Peter: the results will be in {args.root}/EndoCV2021/{args.model_desc}/segmentation/...
     # in wandb.init dict set "name": args.model_desc
 
@@ -108,17 +111,21 @@ if __name__ == '__main__':
      project = "inference",
      config  = {
       "name": args.model_desc,
+      "test_data": args.test_set
      }
     )
     
     # can be multiple test sets: 1 -- 5
     # ground truth folder
-    GT_folder = args.root + args.GT_maskDIR
+    if args.test_set == "C6_pred":
+      GT_folder = args.root + args.GT_maskDIR
+    else:
+      GT_folder = f"{args.root}datasets/endocv2021-test-noCopyAllowed-v3_confidential/segmentation/{args.test_set}_GT/"
     GT_files = glob.glob(os.path.join(GT_folder,'*.jpg'))
     
     # evaluation/predicted folder
-    participantsFolder = "{}/predictions/images_C6_pred/{}".format(args.root, args.model_desc) #args.Eval_maskDIR
-    
+    participantsFolder = f"{args.root}predictions/images_{args.test_set}/{args.model_desc}"
+    print(participantsFolder)
     # save folder
 #    savefolder = 'semantic_results'
 #    os.makedirs(savefolder, exist_ok=True)
@@ -132,7 +139,7 @@ if __name__ == '__main__':
     fnames.append(pred_mask_files)
         
     print('running endocv segmentation...')
-    print(pred_mask_files)
+    #print(pred_mask_files)
     if len(pred_mask_files) > 0:
         gt_mask_files = np.hstack([os.path.join(GT_folder, (os.path.split(f)[-1].split('.')[0])+'.jpg') for f in pred_mask_files])
         
