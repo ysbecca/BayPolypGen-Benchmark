@@ -102,6 +102,7 @@ if __name__ == '__main__':
     import time
     import wandb
     
+    print('Evaluation', flush=True)    
     # ---> requires: !pip install hausdorff (first install !pip install numba==0.49.1)
     # from hausdorff import hausdorff_distance
 
@@ -142,7 +143,7 @@ if __name__ == '__main__':
     pred_mask_files = glob.glob(os.path.join(fpath, '*.jpg'))
     fnames.append(pred_mask_files)
         
-    print('running endocv segmentation...')
+    print('running endocv segmentation...', flush=True)
     #print(pred_mask_files)
     if len(pred_mask_files) > 0:
         gt_mask_files = np.hstack([os.path.join(GT_folder, (os.path.split(f)[-1].split('.')[0])+'.jpg') for f in pred_mask_files])
@@ -212,12 +213,12 @@ if __name__ == '__main__':
         #     hfstd = np.std(Hfd_score/np.max(Hfd_score))
         
         print('----')
-        print ('jac: ', jac_scores.mean(axis=0)), '+', jac_scores.mean(axis=0).mean()
-        print('dice: ', dice_scores.mean(axis=0)), '+', dice_scores.mean(axis=0).mean()
-        print('F2: ', f2_scores.mean(axis=0)), '+', f2_scores.mean(axis=0).mean()
-        print('PPV: ', PPV_scores.mean(axis=0)), '+', PPV_scores.mean(axis=0).mean()
-        print('Rec: ', Rec_scores.mean(axis=0)), '+', Rec_scores.mean(axis=0).mean()
-        print('Acc: ', acc_scores.mean(axis=0)), '+', acc_scores.mean(axis=0).mean()
+        print ('jac: ', jac_scores.mean(axis=0), '+', jac_scores.mean(axis=0).mean(), flush=True)
+        print('dice: ', dice_scores.mean(axis=0), '+', dice_scores.mean(axis=0).mean(),flush=True)
+        print('F2: ', f2_scores.mean(axis=0), '+', f2_scores.mean(axis=0).mean(),flush=True)
+        print('PPV: ', PPV_scores.mean(axis=0), '+', PPV_scores.mean(axis=0).mean(), flush=True)
+        print('Rec: ', Rec_scores.mean(axis=0), '+', Rec_scores.mean(axis=0).mean(), flush=True)
+        print('Acc: ', acc_scores.mean(axis=0), '+', acc_scores.mean(axis=0).mean(), flush=True)
         # Normalise
         # print('Hdf: ', hfmean), '+', hfmean
         print('++++')
