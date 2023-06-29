@@ -4,7 +4,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-7
+#SBATCH --array=1-4
 
 module load cuda
 
@@ -14,13 +14,11 @@ conda activate pyvis
 export WANDB_MODE=online
 
 # TODO 1: fill in the MODELS list with all the string model descs you want to evaluate
-MODELS=("legendary-moon-51" \
-	"lively-moon-53" \
-	"dainty-smoke-55" \
-	"rosy-sun-49" \
-	"clear-puddle-40" \
-	"rosy-dragon-50" \
-	"vivid-sky-52" \
+MODELS=("stellar-deluge-24" \
+	"smart-haze-24" \
+	"hearty-grass-22" \
+	"expert-moon-23" \
+	"olive-lion-21" \
 )
 
 # TODO 2: fill in these paths
@@ -36,7 +34,7 @@ do
 	if [ $task_id = $SLURM_ARRAY_TASK_ID ]
 	then
 		python polypGen_inference-seg.py \
-			--moment_count 10 \
+			--moment_count 6 \
 			--model_desc $model \
 			--root $ROOT
 
@@ -49,7 +47,7 @@ do
 		echo $model
 		exit 0
 	fi
-	let $task_id=task_id+1
+	let task_id=$task_id+1
 done
 
 # python polypGen_inference-seg.py --moment_count 7 --model_desc "driven-sun-53" --root /users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/
