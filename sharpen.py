@@ -48,7 +48,8 @@ def get_argparser():
 
     parser.add_argument("--dev_run", type=bool, default=False,
                         help='does not save checkpoints or log metrics when in dev mode')
-
+    parser.add_argument("--model_desc", type=str, default='',
+                        help="description of baseline Bayesian model")
     # debiasing options
     parser.add_argument("--sharpen", type=str, default=False,
                         help="use posterior sharpening method during training")
@@ -121,9 +122,6 @@ def get_argparser():
                         help="restore from checkpoint")
     parser.add_argument("--continue_training", action='store_true', default=False)
 
-    parser.add_argument("--loss_type", type=str, default='cross_entropy',
-                        choices=['cross_entropy', 'focal_loss'], help="loss type (default: False)")
-
     parser.add_argument("--gpu_id", type=str, default='0',
                         help="GPU ID")
     parser.add_argument("--weight_decay", type=float, default=1e-4,
@@ -176,84 +174,24 @@ def get_dataset(opts):
                                 std=[0.229, 0.224, 0.225]),
             ])
             
-    if opts.epiupwt:
-        epi_dims = (opts.models_per_cycle, 2, 512, 512)
-    else:
-        epi_dims = None 
 
     train_dst = polyGenSeg(
         root=f"{opts.root}datasets/{opts.data_root}",
         image_set='train_polypGen',
         download=opts.download,
+        indices=True,
         transform=train_transform,
-        epi_dims=epi_dims,
     )
 
     val_dst = polyGenSeg(
         root=f"{opts.root}datasets/{opts.data_root}",
         image_set='val_polypGen',
         download=False,
+        indices=True,
         transform=val_transform
     )
         
     return train_dst, val_dst
-
-
-# TODO validate on full posterior!
-def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
-    """Do validation and return specified samples"""
-    metrics.reset()
-    ret_samples = []
-    directoryName = 'results_%s_%s'%(opts.dataType, opts.model)
-    if opts.save_val_results:
-        if not os.path.exists(directoryName):
-            os.mkdir(directoryName)
-        denorm = utils.Denormalize(mean=[0.485, 0.456, 0.406], 
-                                   std=[0.229, 0.224, 0.225])
-        img_id = 0
-
-    with torch.no_grad():
-        for i, (images, labels) in tqdm(enumerate(loader)):
-            
-            images = images.to(device, dtype=torch.float32)
-            labels = labels.to(device, dtype=torch.long)
-
-            outputs = model(images)
-            preds = outputs.detach().max(dim=1)[1].cpu().numpy()
-            targets = labels.cpu().numpy()
-            
-            metrics.update(targets, preds)
-            if ret_samples_ids is not None and i in ret_samples_ids:  # get vis samples
-                ret_samples.append(
-                    (images[0].detach().cpu().numpy(), targets[0], preds[0]))
-
-            if opts.save_val_results:
-                for i in range(len(images)):
-                    image = images[i].detach().cpu().numpy()
-                    target = targets[i]
-                    pred = preds[i]
-
-                    image = (denorm(image) * 255).transpose(1, 2, 0).astype(np.uint8)
-                    target =(target).astype(np.uint8)
-                    pred = (pred).astype(np.uint8)
-
-                    Image.fromarray(image).save(directoryName + '/%d_image.png' % img_id)
-                    Image.fromarray(target).save(directoryName +'/%d_target.png' % img_id)
-                    Image.fromarray(pred).save(directoryName+'/%d_pred.png' % img_id)
-
-                    fig = plt.figure()
-                    plt.imshow(image)
-                    plt.axis('off')
-                    plt.imshow(pred, alpha=0.7)
-                    ax = plt.gca()
-                    ax.xaxis.set_major_locator(matplotlib.ticker.NullLocator())
-                    ax.yaxis.set_major_locator(matplotlib.ticker.NullLocator())
-                    plt.savefig(directoryName+'/%d_overlay.png' % img_id, bbox_inches='tight', pad_inches=0)
-                    plt.close()
-                    img_id += 1
-
-        score = metrics.get_results()
-    return score, ret_samples
 
 
 def main():
@@ -264,26 +202,24 @@ def main():
     if opts.dataset.lower() == 'voc':
         opts.num_classes = 2 # foreground + background
 
-    model_desc = "test"
-
     project_name = "sharpen"
+    model_desc = opts.model_desc + "_sharpen"
+    if not opts.dev_run:
+        wandb.init(
+            project=project_name,
+            name=model_desc,
+            config={
+                "name": opts.model_desc,
+                "learning_rate": opts.lr,
+                "max_epochs": opts.max_epochs,
+            }
+        )
 
-    wandb.init(
-        project=project_name,
-        config={
-            "learning_rate": opts.lr,
-            "alpha": opts.alpha,
-            "kappa": opts.kappa,
-            "models_per_cycle": opts.models_per_cycle,
-        }
-    )
-
-        model_desc = wandb.run.name
         print(f"Running new experiment under {project_name} named: {wandb.run.name}")
-        if os.path.exists(f"moments/{model_desc}"):
-            print("[ERROR] {model_desc} already exists. Aborting.")
-            exit()
-        utils.mkdir(f"moments/{model_desc}")
+        # if os.path.exists(f"moments/{model_desc}"):
+        #     print("[ERROR] {model_desc} already exists. Aborting.")
+        #     exit()
+        # utils.mkdir(f"moments/{model_desc}")
 
     # Setup visualization
     # vis = Visualizer(port=opts.vis_port,
@@ -359,6 +295,7 @@ def main():
         model = model_map[opts.model](num_classes=opts.num_classes, output_stride=opts.output_stride) 
 
     models = [model for m in range(opts.moment_count)]
+    print("Loaded models", len(models))
 
     if opts.separable_conv and 'plus' in opts.model:
         network.convert_to_separable_conv(model.classifier)
@@ -386,13 +323,15 @@ def main():
             optimizer = torch.optim.SGD(params=[
                 {'params': model.backbone.parameters(), 'lr': 0.1*opts.lr},
                 {'params': model.classifier.parameters(), 'lr': opts.lr},
-            ], lr=opts.lr, momentum=1.0 - opts.alpha, weight_decay=opts.weight_decay)  
+            ], lr=opts.lr, momentum=0.8, weight_decay=opts.weight_decay)  
         return optimizer
 
     def weighting_function(epis):
         return torch.pow((1.0 + epis), opts.kappa)
 
-    optims = [get_optimizers() for m in range(opts.moment_count)]
+    optims = [get_optimizer() for m in range(opts.moment_count)]
+    print("Loaded optims", len(optims))
+
     if opts.loss_type == "pcgrad":
         optims = [PCGrad(o) for o in optims]
 
@@ -406,10 +345,10 @@ def main():
 
     # Set up criterion
     #criterion = utils.get_loss(opts.loss_type)
-    if opts.loss_type == 'focal_loss':
-        criterion = utils.FocalLoss(ignore_index=255, size_average=True)
-    elif opts.loss_type == 'cross_entropy':
-        criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
+    # if opts.loss_type == 'focal_loss':
+    #     criterion = utils.FocalLoss(ignore_index=255, size_average=True)
+    # elif opts.loss_type == 'cross_entropy':
+    criterion = nn.CrossEntropyLoss(ignore_index=255, reduction='mean')
 
     if not opts.dev_run:
         utils.mkdir('checkpoints')
@@ -427,10 +366,14 @@ def main():
 
         print(f"[{not opts.dev_run}] Model saved as {path}")    
 
-    def save_moment(model_desc, model, moment_id):
+    def save_moment(model, moment_id, epoch=-1):
         """ save moment checkpoint
         """
-        path = f"{opts.root}/moments/{model_desc}/{moment_id}.pt"
+        path = f"{opts.root}/moments/{model_desc}/{moment_id}"
+        if epoch > -1:
+            path += f"_{epoch}s"
+
+        path += ".pt"
 
         if not opts.dev_run:
             torch.save({
@@ -471,24 +414,35 @@ def main():
         model.eval()
         return model
 
-    def predict_full_posterior(models, loader):
+    def predict_full_posterior(models, loader, size, compute_acc=False):
 
         m_logits = []
-        true_targets = np.zeroes(1159, 512, 512)
+
+        if opts.dev_run:
+            true_targets = np.zeros((opts.batch_size, 512, 512))
+        else:
+            true_targets = np.zeros((size, 512, 512))
 
         for batch in enumerate(loader):
             _, (_, targets, idxes) = batch
             true_targets[idxes] = targets
 
+            if opts.dev_run:
+                break
+
+        print(true_targets.shape)
         for model_idx, m in enumerate(models):
             m_preds = []
             for batch in enumerate(loader):
                 batch_idx, (images, labels, idxes) = batch
 
                 outputs = model(images)
-                preds_batch = outputs.detach().max(dim=1)[1].cpu().numpy()[0]*255
+                preds_batch = outputs.detach().max(dim=1)[1].cpu().numpy()*255
                 preds_batch = preds_batch.astype(np.uint8)
                 m_preds.append(preds_batch)
+
+                if opts.dev_run:
+                    break
 
             m_logits.append(np.concatenate(m_preds))
 
@@ -498,6 +452,7 @@ def main():
 
         # [N_SAMPLES, 512, 512]
         m_preds = np.mean(m_logits, axis=0)
+        print("m_preds.shape", m_preds.shape)
 
         temp = (m_logits - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
         epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
@@ -507,15 +462,22 @@ def main():
         print("epis_.shape before collapse", epis_.shape)
         # take max or mean?
         epis = epis_.mean(axis=(1, 2))
-        print("epis.shape", epis_.shape)
+        print("epis.shape", epis.shape)
 
-        return m_preds, epis
+        if compute_acc:
+            metrics.reset()
+            # compute useful metrics on validation set... 
+            metrics.update(true_targets, m_preds)
+
+            score = metrics.get_results()
+            return score
+        else:
+            return m_preds, epis
 
     # Restore
     best_score = 0.0
     cur_itrs = 0
     cur_epochs = 0
-    moment_count = 0
 
     # TODO rewrite for Bay version
     # if opts.ckpt is not None and os.path.isfile(opts.ckpt):
@@ -540,20 +502,18 @@ def main():
     vis_sample_id = np.random.randint(0, len(val_loader), opts.vis_num_samples,
                                       np.int32) if (opts.enable_vis or opts.log_masks_wandb) else None 
     denorm = utils.Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  
-
-
     interval_loss = 0
 
-
     # assumes unshuffled set! only once on train
-    mean_preds, epis = predict_full_posterior(models, train_loader)
+    mean_preds, epis = predict_full_posterior(models, train_loader, len(train_dst))
     weights = weighting_function(epis)
 
     train_loader = data.DataLoader(
         train_dst, batch_size=opts.batch_size, shuffle=True, num_workers=2)
     
     for e in range(opts.max_epochs):
-        for model_idx, m in enumerate(models):
+        print("Epoch", e)
+        for moment_id, m in enumerate(models):
             model = load_moment(moment_id, model.to(device), device)
 
             model.train()
@@ -568,7 +528,6 @@ def main():
                 optims[model_idx].zero_grad()
                 outputs = m(images)
         
-                # TODO got to here....
                 # =============== LOSS ======================
                 std_loss = standard_loss(outputs, labels, criterion, weights, device)
                 sharpen_loss = standard_loss(outputs, mean_preds_batch, weights, device)
@@ -582,28 +541,23 @@ def main():
     
                 optims[model_idex].step()
 
-            # TODO save the sharpened moment (but don't overwrite it)
+                # log batch loss...
+                if not opts.dev_run:
+                    wandb.log({"std loss": std_loss, "sharpen loss": sharpen_loss})
+                else:
+                    # single batch per moment per epoch on dev mode
+                    break
 
-            if opts.dev_run: # single itr per epoch only on dev run
-                break
+            # save sharpened moment without overwriting.
+            save_moment(model, model_idx, epoch=e)
 
-            if cur_itrs % 10 == 0:
-                break
+    score = predict_full_posterior(models, val_loader, len(val_dst), compute_acc=True)
+    if opts.dev_run:
+        print(score)
+    else:
+        wandb.log(score)
+    
 
-    # TODO also need to be able to re-compute performance on val set of whole posterior
-    # after each epoch to evaluate how we're doing...
 
-    # to save time let's just rely on the validation performance
-    # bay_inference(
-    #     opts,
-    #     model,
-    #     loader,
-    #     device,
-    #     metrics,
-    #     mt_count=moment_count,
-    #     ret_samples_ids=None,
-    #     model_desc=model_desc
-    # )
-        
 if __name__ == '__main__':
     main()

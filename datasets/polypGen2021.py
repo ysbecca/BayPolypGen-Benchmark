@@ -84,6 +84,7 @@ class VOCSegmentation_polypGen2021(data.Dataset):
                  image_set='train',
                  download=False,
                  epi_dims=None,
+                 indices=False,
                  transform=None,
                  min_c6=False):
         
@@ -139,6 +140,7 @@ class VOCSegmentation_polypGen2021(data.Dataset):
             self.p_hats = None
 
         self.track_epi = epi_dims
+        self.indices = indices
 
         assert (len(self.images) == len(self.masks))
 
@@ -159,7 +161,7 @@ class VOCSegmentation_polypGen2021(data.Dataset):
         if self.transform is not None:
             img, target = self.transform(img, target)
 
-        if self.track_epi:
+        if self.track_epi or self.indices:
             return img, target, index
         else:
             return img, target

@@ -14,6 +14,7 @@ from datasets import VOCSegmentation_polypGen2021 as polyGenSeg
 
 from utils import ext_transforms as et
 from metrics import StreamSegMetrics
+from metrics.metrics_seg import dice_score
 
 import torch
 import torch.nn as nn
@@ -26,6 +27,9 @@ from skimage.transform import resize
 
 import random
 import string
+
+import warnings
+warnings.filterwarnings("ignore")
 
 def plotInference( imgs, depth):
     f =  plt.figure()
@@ -43,7 +47,9 @@ def get_argparser():
 
     parser.add_argument("--dev_run", type=bool, default=False,
                         help='does not save checkpoints or log metrics when in dev mode')
-
+    # only for debiasing
+    parser.add_argument("--model_desc", type=str, default=None,
+                        help='model desc for baseline bay model, only for debiasing methods')
     # debiasing options
     parser.add_argument("--epiupwt", type=str, default=False,
                         help="use EpiUpWt de-biasing method during training")
@@ -99,8 +105,6 @@ def get_argparser():
     parser.add_argument("--save_val_results", action='store_true', default=True,
                         help="save segmentation results to \"./results_polypGen\"")
     
-    parser.add_argument("--total_itrs", type=int, default=30e3, # not used for bay numbers
-                        help="epoch number (default: 30k)")
     parser.add_argument("--lr", type=float, default=0.01,
                         help="learning rate (default: 0.01)")
     parser.add_argument("--lr_policy", type=str, default='poly', choices=['poly', 'step'],
@@ -269,7 +273,8 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
         denorm = utils.Denormalize(mean=[0.485, 0.456, 0.406], 
                                    std=[0.229, 0.224, 0.225])
         img_id = 0
-
+    dice_scores = []
+    loss = 0.0
     with torch.no_grad():
         for i, (images, labels) in tqdm(enumerate(loader)):
             
@@ -277,9 +282,15 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
             labels = labels.to(device, dtype=torch.long)
 
             outputs = model(images)
+            loss += F.cross_entropy(outputs, labels)
+
             preds = outputs.detach().max(dim=1)[1].cpu().numpy()
             targets = labels.cpu().numpy()
-            
+
+
+            for ii in range(len(targets)):
+                dice_scores.append(np.hstack([dice_score(targets[ii], preds[ii])]))
+
             metrics.update(targets, preds)
             if ret_samples_ids is not None and i in ret_samples_ids:  # get vis samples
                 ret_samples.append(
@@ -311,7 +322,11 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
                     img_id += 1
 
         score = metrics.get_results()
-    return score, ret_samples
+        dice_scores = np.vstack(dice_scores)
+        dice = dice_scores.mean(axis=0)[0]
+        loss /= len(loader.dataset)
+        print('CE loss: ', loss, '\nVal samples: ', len(loader.dataset))
+    return score, ret_samples, dice, loss
 
 
 def main():
@@ -322,18 +337,18 @@ def main():
     if opts.dataset.lower() == 'voc':
         opts.num_classes = 2 # foreground + background
 
-    model_desc = "test"
-    if not opts.dev_run:   
-
+    model_desc = ""
+    name = None
+    if not opts.dev_run:        
         project_name = "baybaseline"
         if opts.epiupwt:
             project_name = "epiupwt"
+            name = opts.model_desc
 
-        run_name = opts.model_desc if opts.epiupwt else None
         wandb.init(
             project=project_name,
-            name=run_name,
             config={
+                "name": name,
                 "learning_rate": opts.lr,
                 "cycle_length": opts.cycle_length,
                 "cycles": opts.cycles,
@@ -503,11 +518,14 @@ def main():
 
         return noise_loss
 
+    total_itrs = opts.cycle_length * num_batches
+    print(f"[INFO] total itrs {total_itrs}")
+
     def adjust_learning_rate(model, batch_idx, optim, current_epoch):
         rcounter = (current_epoch) * num_batches + batch_idx
 
-        cos_inner = np.pi * (rcounter % (opts.total_itrs // opts.cycles))
-        cos_inner /= opts.total_itrs // opts.cycles
+        cos_inner = np.pi * (rcounter % (total_itrs // opts.cycles))
+        cos_inner /= total_itrs // opts.cycles
         cos_out = np.cos(cos_inner) + 1
         lr = 0.5 * cos_out * opts.lr
 
@@ -646,7 +664,7 @@ def main():
             if (cur_itrs) % 10 == 0:
                 interval_loss = interval_loss/10
                 print("Epoch %d, Itrs %d/%d, Loss=%f" %
-                      (cur_epochs, cur_itrs, opts.total_itrs, interval_loss))
+                      (cur_epochs, cur_itrs, total_itrs, interval_loss))
                 interval_loss = 0.0  
 
             if (cur_itrs) % opts.val_interval == 0:
@@ -654,7 +672,7 @@ def main():
                 #           (opts.model, opts.dataset, opts.output_stride, opts.dataType, opts.backbone))
                 print("validation...")
                 model.eval()
-                val_score, ret_samples = validate(
+                val_score, ret_samples, dsc, val_loss = validate(
                     opts=opts,
                     model=model,
                     loader=val_loader,
@@ -670,13 +688,15 @@ def main():
                     #           (opts.model, opts.dataset,opts.output_stride, opts.dataType, opts.backbone))
                 if not opts.dev_run:
                     wandb.log({"val_mean_iou": val_score['Mean IoU']})
+                    wandb.log({"dice_score": dsc})
+                    wandb.log({"val_loss": val_loss})
                 # if vis is not None:  # visualize validation score and samples
                 #     vis.vis_scalar("[Val] Overall Acc", cur_itrs, val_score['Overall Acc'])
                 #     vis.vis_scalar("[Val] Mean IoU", cur_itrs, val_score['Mean IoU'])
                 #     vis.vis_table("[Val] Class IoU", val_score['Class IoU'])
                 if not opts.dev_run:
                     wandb.log({"val_acc": val_score['Overall Acc'], "val_class_iou": val_score['Class IoU']})
-
+                print('Val DSC: ', dsc)
                 if opts.log_masks_wandb:
                     samples = []
                     for k, (img, target, lbl) in enumerate(ret_samples):
@@ -694,8 +714,8 @@ def main():
 
             if opts.dev_run: # single itr per epoch only on dev run
                 break
-            #if cur_itrs % 10 == 0:
-             #   break
+            # if cur_itrs % 10 == 0:
+               # break
 
         # within sampling phase
         if ((cur_epochs % opts.cycle_length) + 1) > (opts.cycle_length - opts.models_per_cycle):

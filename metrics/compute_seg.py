@@ -71,9 +71,24 @@ def roi_area(mask):
 def get_args():
     import argparse
     parser = argparse.ArgumentParser(description="Semantic segmentation of EndoCV2021 challenge", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--GT_maskDIR", type=str, default="/media/sharib/development/EndoCV2021-test_analysis/codes-seg/EndoCV2021_groundTruth-v1/segmentation/EndoCV_DATA3_GT", help="ground truth mask image (5 channel tif image only)")
+    parser.add_argument("--GT_maskDIR", type=str, default="datasets/EndoCV2021/data_C6/masks_C6", help="ground truth mask image (5 channel tif image only)")
     parser.add_argument("--Eval_maskDIR", type=str, default="/media/sharib/development/EndoCV2021-test_analysis/codes-seg/EndoCV2021/segmentation/EndoCV_DATA3_pred", help="provide folder for testType1 dataset under that name")
     parser.add_argument("--jsonFileName", type=str, default="metric_seg_score.json", help="all evaluation scores used for grading")
+
+    parser.add_argument("--root", type=str, default="",
+                        help='absolute path to EndoCV2021')
+
+    parser.add_argument("--model_desc", type=str, default='test',
+                        help='model description for loading moments')
+
+    parser.add_argument("--test_set", type=str, default='C6_pred',
+                        help='EndoCV_DATA3, EndoCV_DATA4')
+
+    parser.add_argument("--dev_run", type=bool, default=False)
+
+    # Peter: the results will be in {args.root}/EndoCV2021/{args.model_desc}/segmentation/...
+    # in wandb.init dict set "name": args.model_desc
+
     args = parser.parse_args()
     return args
 
@@ -81,25 +96,41 @@ def get_args():
 if __name__ == '__main__':
     import glob
     import os
-    from misc import EndoCV_misc 
+    # from misc import EndoCV_misc 
     import cv2
     from metrics_seg import get_confusion_matrix_elements, jac_score, dice_score, F2, precision, recall, get_confusion_matrix_torch
     import time
+    import wandb
     
+    print('Evaluation', flush=True)    
     # ---> requires: !pip install hausdorff (first install !pip install numba==0.49.1)
     # from hausdorff import hausdorff_distance
 
     classTypes=['polyp']
     args = get_args()
+
+# Are we using all the hyperparameters or just the name?
+    if not args.dev_run:
+       wandb.init(
+         project = "inference",
+         name = args.model_desc,
+         config  = {
+           "test_data": args.test_set
+         }
+       )
     
     # can be multiple test sets: 1 -- 5
     # ground truth folder
-    GT_folder = args.GT_maskDIR
+    if args.test_set == "C6_pred":
+      GT_folder = args.root + args.GT_maskDIR
+    else:
+      GT_folder = f"{args.root}datasets/endocv2021-test-noCopyAllowed-v3_confidential/segmentation/{args.test_set}_GT/"
     GT_files = glob.glob(os.path.join(GT_folder,'*.jpg'))
     
     # evaluation/predicted folder
-    participantsFolder = args.Eval_maskDIR
-    
+    participantsFolder = f"{args.root}predictions/images_{args.test_set}/{args.model_desc}"
+    print(participantsFolder)
+
     # save folder
 #    savefolder = 'semantic_results'
 #    os.makedirs(savefolder, exist_ok=True)
@@ -112,8 +143,8 @@ if __name__ == '__main__':
     pred_mask_files = glob.glob(os.path.join(fpath, '*.jpg'))
     fnames.append(pred_mask_files)
         
-    print('running endocv segmentation...')
-    print(pred_mask_files)
+    print('running endocv segmentation...', flush=True)
+    #print(pred_mask_files)
     if len(pred_mask_files) > 0:
         gt_mask_files = np.hstack([os.path.join(GT_folder, (os.path.split(f)[-1].split('.')[0])+'.jpg') for f in pred_mask_files])
         
@@ -182,12 +213,12 @@ if __name__ == '__main__':
         #     hfstd = np.std(Hfd_score/np.max(Hfd_score))
         
         print('----')
-        print ('jac: ', jac_scores.mean(axis=0)), '+', jac_scores.mean(axis=0).mean()
-        print('dice: ', dice_scores.mean(axis=0)), '+', dice_scores.mean(axis=0).mean()
-        print('F2: ', f2_scores.mean(axis=0)), '+', f2_scores.mean(axis=0).mean()
-        print('PPV: ', PPV_scores.mean(axis=0)), '+', PPV_scores.mean(axis=0).mean()
-        print('Rec: ', Rec_scores.mean(axis=0)), '+', Rec_scores.mean(axis=0).mean()
-        print('Acc: ', acc_scores.mean(axis=0)), '+', acc_scores.mean(axis=0).mean()
+        print ('jac: ', jac_scores.mean(axis=0), '+', jac_scores.mean(axis=0).mean(), flush=True)
+        print('dice: ', dice_scores.mean(axis=0), '+', dice_scores.mean(axis=0).mean(),flush=True)
+        print('F2: ', f2_scores.mean(axis=0), '+', f2_scores.mean(axis=0).mean(),flush=True)
+        print('PPV: ', PPV_scores.mean(axis=0), '+', PPV_scores.mean(axis=0).mean(), flush=True)
+        print('Rec: ', Rec_scores.mean(axis=0), '+', Rec_scores.mean(axis=0).mean(), flush=True)
+        print('Acc: ', acc_scores.mean(axis=0), '+', acc_scores.mean(axis=0).mean(), flush=True)
         # Normalise
         # print('Hdf: ', hfmean), '+', hfmean
         print('++++')
@@ -306,12 +337,19 @@ if __name__ == '__main__':
                     }, 
                 }
         }   
-                
+        if not args.dev_run:        
+            wandb.log({
+                "dice": dice_scores.mean(axis=0)[0], "dice_std": np.std(dice_scores),
+                "jaccard": jac_scores.mean(axis=0)[0], "jc_std": np.std(jac_scores),
+                "f2": f2_scores.mean(axis=0)[0], "f2_std": np.std(f2_scores),
+                "PPV": PPV_scores.mean(axis=0)[0], "PPV_std": np.std(PPV_scores),
+                "recall": Rec_scores.mean(axis=0)[0], "recall_std": np.std(Rec_scores),
+                 "OverallAcc": np.mean(acc_scores), "acc_std": np.std(acc_scores)
+            })
+
+            wandb.finish()
         
         # write to json      
         jsonFileName=args.jsonFileName
-        EndoCV_misc.write2json(jsonFileName, my_dictionary)
+        # EndoCV_misc.write2json(jsonFileName, my_dictionary)
         
-    
-
-

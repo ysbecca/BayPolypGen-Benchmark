@@ -18,18 +18,20 @@ import skimage
 from skimage import io
 from  tifffile import imsave
 import skimage.transform
-
+from collections import OrderedDict
 import matplotlib.pyplot as plt
 
-def create_predFolder(task_type):
-    directoryName = 'EndoCV2021'
-    if not os.path.exists(directoryName):
-        os.mkdir(directoryName)
+def create_predFolder(root, model_desc, test_data=None):
+    #path = f"{root}predictions/images_C6_pred/{model_desc}/"
+    #if test_data:
+    folder_path = f"{root}predictions/images_{test_data}/"
+    if not os.path.exists(folder_path):
+      os.mkdir(folder_path)
+    path = f"{root}predictions/images_{test_data}/{model_desc}/"
+    if not os.path.exists(path):
+      os.mkdir(path)
         
-    if not os.path.exists(os.path.join(directoryName, task_type)):
-        os.mkdir(os.path.join(directoryName, task_type))
-        
-    return os.path.join(directoryName, task_type)
+    return path
 
 def detect_imgs(infolder, ext='.tif'):
     import os
@@ -81,6 +83,8 @@ def get_argparser():
     parser.add_argument("--random_seed", type=int, default=1,
                         help="random seed (default: 1)")
 
+    parser.add_argument("--test_set", type=str, default="C6_pred",
+                        help="options: C6_pred, EndoCV_DATA3, EndoCV_DATA4")
     return parser
 
     
@@ -98,7 +102,7 @@ def mymodel():
 
     print("Model description: ", opts.model_desc)
     print("Moment count:      ", opts.moment_count)
-
+    print("Dataset:           ", opts.test_set)
     print("="*30)
 
     # ---> explicit classs number
@@ -178,7 +182,20 @@ def load_moment(moment_id, model, device):
     checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
     state_dict = checkpoint['model_state']
 
-    model.load_state_dict(state_dict)
+    try:
+        model.load_state_dict(state_dict)
+
+    except:
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+             if 'module' not in k:
+                 k = 'module.'+k
+             else:
+                 k = k.replace('features.module.', 'module.features.')
+             new_state_dict[k]=v
+
+        model.load_state_dict(new_state_dict)
+            
     model.eval()
 
     return model
@@ -212,13 +229,8 @@ if __name__ == '__main__':
 #        dirN = 'test_best_endocv2021'+opts.model
 #    else:
 #        dirN = 'test_best_endocv2021'+opts.model+'_'+opts.backbone
-    dirN = opts.model_desc
-    directoryName = create_predFolder(dirN)
-    
-
-    task_type = './'+ dirN + '/' + 'segmentation'
-    # set image folder here!
-    directoryName = create_predFolder(task_type)
+    # set image folder here! ./frosty/segmentation
+    saveDir = create_predFolder(opts.root, opts.model_desc, opts.test_set)
     
     # ----> three test folders [https://github.com/sharibox/EndoCV2021-polyp_det_seg_gen/wiki/EndoCV2021-Leaderboard-guide]
     
@@ -230,20 +242,25 @@ if __name__ == '__main__':
     all_epistemics = []
 
     #subDirs = ['EndoCV_DATA4', 'EndoCV_DATAPaperC6']
-    subDirs = ['images_C6']
+    print(opts.test_set)
+    subDirs = [opts.test_set]
     for j in range(0, len(subDirs)):
         
         # ---> Folder for test data location!!! (Warning!!! do not copy/visulise!!!)
         #imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
-        imgfolder = opts.root + 'datasets/EndoCV2021/data_C6/' + subDirs[j]
-        
-        # imgfolder = '/usr/not-backed-up/BayPolypGen-Benchmark/datasets/EndoCV2021/data_C6/' + subDirs[j]
 
-        # set folder to save your checkpoints here!
-        saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
-    
-        if not os.path.exists(saveDir):
-            os.mkdir(saveDir)
+        if not opts.root:
+            imgfolder = '/resstore/b0211/Users/scpecs/' 
+        else:
+            imgfolder = opts.root
+        if opts.test_set == "C6_pred":
+          imgfolder += f"datasets/EndoCV2021/data_C6/" + subDirs[j]
+        else:
+          imgfolder += f"datasets/endocv2021-test-noCopyAllowed-v3_confidential/" + subDirs[j]
+
+        # # set folder to save your checkpoints here!
+        # saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
+
 
         imgfiles = detect_imgs(imgfolder, ext='.jpg')
     
@@ -300,7 +317,6 @@ if __name__ == '__main__':
 
             # take mean
             epi = epis_.max()
-            print("epi", epi)
             all_epistemics.append(epi)
 
             # final averaged prediction seg map
