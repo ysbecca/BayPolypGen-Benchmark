@@ -81,13 +81,11 @@ def get_args():
     parser.add_argument("--model_desc", type=str, default='test',
                         help='model description for loading moments')
 
-<<<<<<< HEAD
     parser.add_argument("--test_set", type=str, default='C6_pred',
                         help='EndoCV_DATA3, EndoCV_DATA4')
 
-=======
     parser.add_argument("--dev_run", type=bool, default=False)
->>>>>>> 6d6fe7f2801f21da6a753bb5cb009ee9463366e5
+
     # Peter: the results will be in {args.root}/EndoCV2021/{args.model_desc}/segmentation/...
     # in wandb.init dict set "name": args.model_desc
 
@@ -111,7 +109,6 @@ if __name__ == '__main__':
     args = get_args()
 
 # Are we using all the hyperparameters or just the name?
-<<<<<<< HEAD
     if not args.dev_run:
        wandb.init(
          project = "inference",
