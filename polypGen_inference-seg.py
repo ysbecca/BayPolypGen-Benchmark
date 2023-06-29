@@ -294,7 +294,7 @@ if __name__ == '__main__':
             m_preds = np.array(m_preds)
             # get epistemic uncertainties.... and average for single value 
             # accumulate epistemic uncertainties
-            temp = (m_preds - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
+            temp = (m_preds - np.broadcast_to(np.mean(m_preds, axis=0), (opts.moment_count, *m_preds.shape)))**2
             epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
             epis_ = epis_.astype(np.double)
 
@@ -313,9 +313,9 @@ if __name__ == '__main__':
 
             # imsave(saveDir +'/'+ filename +'_mask.jpg', img_mask.astype(np.uint8))
 
-    all_epistemics = np.array(all_epistemics)
-    np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
-    print("epis saved. exiting.")
+    # all_epistemics = np.array(all_epistemics)
+    # np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
+    # print("epis saved. exiting.")
     # file.write('%s -----> %s \n' % 
        # ('average_t', np.mean(timeappend)))
 

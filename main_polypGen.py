@@ -323,15 +323,16 @@ def main():
         opts.num_classes = 2 # foreground + background
 
     model_desc = "test"
-    if not opts.dev_run:        
+    if not opts.dev_run:   
+
         project_name = "baybaseline"
         if opts.epiupwt:
             project_name = "epiupwt"
-        elif opts.sharpen:
-            project_name = "sharpen"
 
+        run_name = opts.model_desc if opts.epiupwt else None
         wandb.init(
             project=project_name,
+            name=run_name,
             config={
                 "learning_rate": opts.lr,
                 "cycle_length": opts.cycle_length,
