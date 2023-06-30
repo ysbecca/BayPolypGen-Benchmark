@@ -714,7 +714,7 @@ def main():
 
             if opts.dev_run: # single itr per epoch only on dev run
                 break
-            # if cur_itrs % 10 == 0:
+            #if cur_itrs % 10 == 0:
                # break
 
         # within sampling phase

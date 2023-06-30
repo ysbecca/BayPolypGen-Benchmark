@@ -102,7 +102,6 @@ if __name__ == '__main__':
     import time
     import wandb
     
-    print('Evaluation', flush=True)    
     # ---> requires: !pip install hausdorff (first install !pip install numba==0.49.1)
     # from hausdorff import hausdorff_distance
 
@@ -144,7 +143,7 @@ if __name__ == '__main__':
     fnames.append(pred_mask_files)
         
     print('running endocv segmentation...', flush=True)
-    #print(pred_mask_files)
+
     if len(pred_mask_files) > 0:
         gt_mask_files = np.hstack([os.path.join(GT_folder, (os.path.split(f)[-1].split('.')[0])+'.jpg') for f in pred_mask_files])
         
@@ -157,7 +156,6 @@ if __name__ == '__main__':
         Hfd_score = []
         start = time.time()
         for jj in range(len(pred_mask_files))[:]:
-            print(gt_mask_files[jj])
             gt_mask = (cv2.imread(gt_mask_files[jj]) > 0).astype(np.uint8)[:,:,0]
             pred_mask = (cv2.imread(pred_mask_files[jj]) > 0).astype(np.uint8)
             
@@ -196,7 +194,6 @@ if __name__ == '__main__':
             Rec_scores.append(Rec_set)
             acc_scores.append(acc)
             # Hfd_score.append(Hf)
-            
         
         jac_scores = np.vstack(jac_scores)
         dice_scores = np.vstack(dice_scores)
@@ -337,18 +334,18 @@ if __name__ == '__main__':
                     }, 
                 }
         }   
-        if not args.dev_run:        
+
+        if not args.dev_run:  
             wandb.log({
                 "dice": dice_scores.mean(axis=0)[0], "dice_std": np.std(dice_scores),
                 "jaccard": jac_scores.mean(axis=0)[0], "jc_std": np.std(jac_scores),
                 "f2": f2_scores.mean(axis=0)[0], "f2_std": np.std(f2_scores),
                 "PPV": PPV_scores.mean(axis=0)[0], "PPV_std": np.std(PPV_scores),
                 "recall": Rec_scores.mean(axis=0)[0], "recall_std": np.std(Rec_scores),
-                 "OverallAcc": np.mean(acc_scores), "acc_std": np.std(acc_scores)
+                "OverallAcc": np.mean(acc_scores), "acc_std": np.std(acc_scores)
             })
 
             wandb.finish()
-        
         # write to json      
         jsonFileName=args.jsonFileName
         # EndoCV_misc.write2json(jsonFileName, my_dictionary)
