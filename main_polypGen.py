@@ -262,7 +262,7 @@ def bay_inference(opts, model, loader, device, metrics, mt_count=0, ret_samples_
 
     return score
 
-def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
+def validate(opts, model, loader, device, metrics, ret_samples_ids=None, wandb_logger=None):
     """Do validation and return specified samples"""
     metrics.reset()
     ret_samples = []
@@ -282,8 +282,8 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
             labels = labels.to(device, dtype=torch.long)
 
             outputs = model(images)
-            loss += F.cross_entropy(outputs, labels)
-
+            loss = F.cross_entropy(outputs, labels)
+            wandb_logger.log({'val_loss':loss})
             preds = outputs.detach().max(dim=1)[1].cpu().numpy()
             targets = labels.cpu().numpy()
 
@@ -324,9 +324,8 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
         score = metrics.get_results()
         dice_scores = np.vstack(dice_scores)
         dice = dice_scores.mean(axis=0)[0]
-        loss /= len(loader.dataset)
-        print('CE loss: ', loss, '\nVal samples: ', len(loader.dataset))
-    return score, ret_samples, dice, loss
+
+    return score, ret_samples, dice
 
 
 def main():
@@ -675,13 +674,14 @@ def main():
                 #           (opts.model, opts.dataset, opts.output_stride, opts.dataType, opts.backbone))
                 print("validation...")
                 model.eval()
-                val_score, ret_samples, dsc, val_loss = validate(
+                val_score, ret_samples, dsc = validate(
                     opts=opts,
                     model=model,
                     loader=val_loader,
                     device=device,
                     metrics=metrics,
                     ret_samples_ids=vis_sample_id,
+                    wandb_logger=wandb
                 )
 
                 print(metrics.to_str(val_score))
@@ -692,7 +692,6 @@ def main():
                 if not opts.dev_run:
                     wandb.log({"val_mean_iou": val_score['Mean IoU']})
                     wandb.log({"dice_score": dsc})
-                    wandb.log({"val_loss": val_loss})
                 # if vis is not None:  # visualize validation score and samples
                 #     vis.vis_scalar("[Val] Overall Acc", cur_itrs, val_score['Overall Acc'])
                 #     vis.vis_scalar("[Val] Mean IoU", cur_itrs, val_score['Mean IoU'])
