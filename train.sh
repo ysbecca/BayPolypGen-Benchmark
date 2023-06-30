@@ -13,8 +13,9 @@ module load cuda
 source /nobackup/projects/bdlds05/rsstone/miniconda/etc/profile.d/conda.sh
 conda activate pyvis
 
-export WANDB_MODE=offline
-export WANDB_DIR="/resstore/b0211/Users/scpecs/BayPolypGen-Benchmark/"
+export WANDB_MODE=online
+export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
+
 
 python main_polypGen.py \
 	--cycle_length 350 \
@@ -23,5 +24,3 @@ python main_polypGen.py \
 	--model "deeplabv3plus_resnet50" \
 	--root "/resstore/b0211/Users/scpecs/" \
 	--lr 0.1 
-
-wandb sync
