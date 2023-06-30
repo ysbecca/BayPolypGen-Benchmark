@@ -14,14 +14,14 @@ source /nobackup/projects/bdlds05/rsstone/miniconda/etc/profile.d/conda.sh
 conda activate pyvis
 
 export WANDB_MODE=offline
-export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
+export WANDB_DIR="/resstore/b0211/Users/scpecs/BayPolypGen-Benchmark/"
 
 python main_polypGen.py \
 	--cycle_length 350 \
 	--cycles 1 \
 	--models_per_cycle 10 \
 	--model "deeplabv3plus_resnet50" \
-	--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/" \
+	--root "/resstore/b0211/Users/scpecs/" \
 	--lr 0.1 
 
 wandb sync
