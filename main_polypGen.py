@@ -59,6 +59,9 @@ def get_argparser():
                     help="weighting scalar")
     parser.add_argument("--cycle_length", type=int, default=150,
                     help="default cycle length")
+    # only used for inference runs 
+    parser.add_argument("--moment_count", type=int, default=2,
+                    help="inference only moment count, overrides models per cycle")
     parser.add_argument("--cycles", type=int, default=1,
                     help="number of total inference cycles")
     parser.add_argument("--models_per_cycle", type=int, default=5,
@@ -184,83 +187,27 @@ def get_dataset(opts):
     else:
         epi_dims = None 
 
+    indices = True if opts.cycles == 0 else False
+
     train_dst = polyGenSeg(
         root=f"{opts.root}datasets/{opts.data_root}",
         image_set='train_polypGen',
         download=opts.download,
         transform=train_transform,
         epi_dims=epi_dims,
+        indices=indices,
     )
 
     val_dst = polyGenSeg(
         root=f"{opts.root}datasets/{opts.data_root}",
         image_set='val_polypGen',
         download=False,
-        transform=val_transform
+        transform=val_transform,
+        indices=indices,
     )
         
     return train_dst, val_dst
 
-def bay_inference(opts, model, loader, device, metrics, mt_count=0, ret_samples_ids=None, model_desc=None):
-    """ Do Bayesian inference from posterior samples and return metrics, preds and epis. """
-    metrics.reset()
-    ret_samples = []
-    directoryName = 'results_%s_%s'%(opts.dataType, opts.model)
-    # if opts.save_val_results:
-    #     if not os.path.exists(directoryName):
-    #         os.mkdir(directoryName)
-    #     denorm = utils.Denormalize(mean=[0.485, 0.456, 0.406], 
-    #                                std=[0.229, 0.224, 0.225])
-    #     img_id = 0
-
-    with torch.no_grad():
-
-        def get_targets_from_dataloader(dataloader):
-            targets = []
-            for _, target in dataloader:
-                targets.append(target)
-            targets_tensor = torch.tensor(targets)
-            return targets_tensor
-
-        targets = get_targets_from_dataloader(loader).cpu().numpy()
-
-
-        m_logits = {i: [] for i in range(mt_count)}
-        for m in range(mt_count):
-            moment_path = f"moments/{model_desc}_{moment_id}.pt"
-            moment_ckpt = torch.load(moment_path, map_location=torch.device('cpu'))
-           
-            model.load_state_dict(checkpoint["model_state"])
-            model = model.to(device)
-
-            for i, (images, labels) in enumerate(loader):
-                
-                images = images.to(device, dtype=torch.float32)
-                outputs = model(images)
-                preds = outputs.detach().max(dim=1)[1].cpu().numpy()
-                print("preds.shape", preds.shape)
-                exit()
-
-                m_logits[m].append(preds)
-                
-        # [N_MOMENTS, N_SAMPLES, N_CLASSES]
-        m_logits = torch.stack([torch.cat(m_logits[i], dim=0) for i in range(mt_count)])
-        # [SAMPLES, N_CLASSES]
-        m_preds = m_logits.mean(dim=0)
-
-        # TODO check the shape here; need another mean across dims probably!
-        print("m_shape.shape", m_shape.shape)
-
-        # accumulate epistemic uncertainties
-        temp = (m_logits - m_preds.expand((mt_count, *m_preds.shape)))**2
-        epis_ = torch.sqrt(torch.sum(temp, axis=0)) / mt_count
-        epis_ = torch.Tensor([e[int(i)] for e, i in zip(epis_, targets)]).double().to(device)
-        epis = epis_ * 10.
-
-    metrics.update(targets, m_preds)
-    score = metrics.get_results()
-
-    return score
 
 def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
     """Do validation and return specified samples"""
@@ -329,6 +276,7 @@ def validate(opts, model, loader, device, metrics, ret_samples_ids=None):
     return score, ret_samples, dice, loss
 
 
+
 def main():
     torch.cuda.is_available()
     torch.cuda.device_count()
@@ -339,7 +287,7 @@ def main():
 
     model_desc = ""
     name = None
-    if not opts.dev_run:        
+    if not opts.dev_run and opts.cycles > 0:        
         project_name = "baybaseline"
         if opts.epiupwt:
             project_name = "epiupwt"
@@ -386,6 +334,9 @@ def main():
     
     train_dst, val_dst = get_dataset(opts)
     
+    # don't shuffle if just doing inference on train/val sets
+    shuffle = True if opts.cycles else False
+
     train_loader = data.DataLoader(
         train_dst, batch_size=opts.batch_size, shuffle=True, num_workers=2)
     val_loader = data.DataLoader(
@@ -494,7 +445,11 @@ def main():
                 "best_score": best_score,
             }, path)
 
-        print(f"[{not opts.dev_run}] Model saved as {path}")    
+        print(f"[{not opts.dev_run}] Model saved as {path}")   
+
+    if opts.cycles == 0:
+        model_desc = opts.model_desc
+
     print(f"[INFO] Defined: {model_desc}.")
     def save_moment(model, moment_id):
         """ save moment checkpoint
@@ -564,30 +519,93 @@ def main():
     def weighting_function(epistemics):
         return torch.pow((1.0 + torch.tensor(epistemics)), opts.kappa)
 
+    def load_moment(moment_id, model, device):
+
+        checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
+        state_dict = checkpoint['model_state']
+
+        try:
+            model.load_state_dict(state_dict)
+        except:
+            new_state_dict = OrderedDict()
+            for k, v in state_dict.items():
+                 if 'module' not in k:
+                     k = 'module.'+k
+                 else:
+                     k = k.replace('features.module.', 'module.features.')
+                 new_state_dict[k]=v
+
+            model.load_state_dict(new_state_dict)
+                
+        model.eval()
+
+        return model
+
+    def predict_full_posterior(model, loader, size, device, compute_acc=False):
+        if opts.dev_run:
+            true_targets = np.zeros((opts.batch_size, 512, 512))
+        else:
+            true_targets = np.zeros((size, 512, 512))
+
+        for batch in enumerate(loader):
+            _, (_, targets, idxes) = batch
+            true_targets[idxes] = targets
+
+            if opts.dev_run:
+                break
+
+        print(true_targets.shape)
+        m_logits = []
+
+        for model_idx in range(opts.moment_count):
+            model = load_moment(model_idx, model, device)
+
+            m_preds = []
+            for batch in enumerate(loader):
+                batch_idx, (images, labels, idxes) = batch
+
+                outputs = model(images)
+                preds_batch = outputs.detach().max(dim=1)[1].cpu().numpy()*255
+                preds_batch = preds_batch.astype(np.uint8)
+                m_preds.append(preds_batch)
+
+                if opts.dev_run:
+                    break
+
+            m_logits.append(np.concatenate(m_preds))
+
+        # [N_MOMENTS, N_SAMPLES, 512, 512]
+        m_logits = np.array(m_logits)
+
+        # [N_SAMPLES, 512, 512]
+        m_preds = np.mean(m_logits, axis=0)
+
+        temp = (m_logits - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
+        epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
+        epis_ = epis_.astype(np.double)
+
+        # [N_SAMPLES, 512, 512]
+        print("epis_.shape before collapse", epis_.shape)
+        # take max or mean?
+        epis = epis_.mean(axis=(1, 2))
+        print("epis.shape", epis.shape)
+
+        if compute_acc:
+            metrics.reset()
+            # compute useful metrics on validation set... 
+            metrics.update(true_targets, m_preds)
+
+            score = metrics.get_results()
+            return score, m_preds, epis_, true_targets
+        else:
+            return m_preds, epis
+    
     # Restore
     best_score = 0.0
     cur_itrs = 0
     cur_epochs = 0
     moment_count = 0
 
-    # TODO rewrite for Bay version
-    # if opts.ckpt is not None and os.path.isfile(opts.ckpt):
-    #     checkpoint = torch.load(opts.ckpt, map_location=torch.device('cpu'))
-    #     model.load_state_dict(checkpoint["model_state"])
-    #     model = nn.DataParallel(model)
-    #     model.to(device)
-    #     if opts.continue_training:
-    #         optimizer.load_state_dict(checkpoint["optimizer_state"])
-    #         scheduler.load_state_dict(checkpoint["scheduler_state"])
-    #         cur_itrs = checkpoint["cur_itrs"]
-    #         best_score = checkpoint['best_score']
-    #         print("Training state restored from %s" % opts.ckpt)
-    #     print("Model restored from %s" % opts.ckpt)
-    #     del checkpoint  # free memory
-    # else:
-    #     print("[!] Retrain")
-    #     model = nn.DataParallel(model)
-    #     model.to(device)
 
     #==========   Train Loop   ==========#
     vis_sample_id = np.random.randint(0, len(val_loader), opts.vis_num_samples,
@@ -595,7 +613,7 @@ def main():
     denorm = utils.Denormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  
 
     interval_loss = 0
-    while True: 
+    while True and opts.cycles > 0: 
 
         # =====  Train  =====
         model.train()
@@ -729,17 +747,27 @@ def main():
         
             
 
-    # to save time let's just rely on the validation performance
-    # bay_inference(
-    #     opts,
-    #     model,
-    #     loader,
-    #     device,
-    #     metrics,
-    #     mt_count=moment_count,
-    #     ret_samples_ids=None,
-    #     model_desc=model_desc
-    # )
+    if opts.cycles == 0:
+        print("[INFO] cut straight to predicting.")
+        score, m_preds, epis, targets = predict_full_posterior(
+                model,
+                train_loader,
+                len(train_dst),
+                device,
+                compute_acc=True
+        )
+        for key, value in score.items():
+            print(f"{key}:   {value}")
+
+        moment_dir = f"{opts.root}/moments/{opts.model_desc}/"
+
+        np.save(f"{moment_dir}/epis.npy", epis)
+        np.save(f"{moment_dir}/preds.npy", m_preds)
+        np.save(f"{moment_dir}/targets.npy", targets)
+
+
+
+
         
 if __name__ == '__main__':
     main()
