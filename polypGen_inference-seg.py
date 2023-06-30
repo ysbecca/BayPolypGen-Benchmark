@@ -21,11 +21,15 @@ import skimage.transform
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 
-def create_predFolder(root, model_desc):
-    path = f"{root}predictions/images_C6_pred/{model_desc}/"
-    print(path)
+def create_predFolder(root, model_desc, test_data=None):
+    #path = f"{root}predictions/images_C6_pred/{model_desc}/"
+    #if test_data:
+    folder_path = f"{root}predictions/images_{test_data}/"
+    if not os.path.exists(folder_path):
+      os.mkdir(folder_path)
+    path = f"{root}predictions/images_{test_data}/{model_desc}/"
     if not os.path.exists(path):
-        os.mkdir(path)
+      os.mkdir(path)
         
     return path
 
@@ -80,6 +84,8 @@ def get_argparser():
     parser.add_argument("--random_seed", type=int, default=1,
                         help="random seed (default: 1)")
 
+    parser.add_argument("--test_set", type=str, default="C6_pred",
+                        help="options: C6_pred, EndoCV_DATA3, EndoCV_DATA4")
     return parser
 
     
@@ -97,7 +103,7 @@ def mymodel():
 
     print("Model description: ", opts.model_desc)
     print("Moment count:      ", opts.moment_count)
-
+    print("Dataset:           ", opts.test_set)
     print("="*30)
 
     # ---> explicit classs number
@@ -225,7 +231,7 @@ if __name__ == '__main__':
 #    else:
 #        dirN = 'test_best_endocv2021'+opts.model+'_'+opts.backbone
     # set image folder here! ./frosty/segmentation
-    saveDir = create_predFolder(opts.root, opts.model_desc)
+    saveDir = create_predFolder(opts.root, opts.model_desc, opts.test_set)
     
     # ----> three test folders [https://github.com/sharibox/EndoCV2021-polyp_det_seg_gen/wiki/EndoCV2021-Leaderboard-guide]
     
@@ -237,7 +243,8 @@ if __name__ == '__main__':
     all_epistemics = []
 
     #subDirs = ['EndoCV_DATA4', 'EndoCV_DATAPaperC6']
-    subDirs = ['images_C6']
+    print(opts.test_set)
+    subDirs = [opts.test_set]
     for j in range(0, len(subDirs)):
         
         # ---> Folder for test data location!!! (Warning!!! do not copy/visulise!!!)
@@ -246,10 +253,13 @@ if __name__ == '__main__':
             imgfolder = '/resstore/b0211/Users/scpecs/' 
         else:
             imgfolder = opts.root
-        imgfolder += f"datasets/EndoCV2021/data_C6/" + subDirs[j]
+        if opts.test_set == "C6_pred":
+          imgfolder += f"datasets/EndoCV2021/data_C6/" + subDirs[j]
+        else:
+          imgfolder += f"datasets/endocv2021-test-noCopyAllowed-v3_confidential/" + subDirs[j]
 
         # # set folder to save your checkpoints here!
-        # saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
+        saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
 
         imgfiles = detect_imgs(imgfolder, ext='.jpg')
     
