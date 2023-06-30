@@ -416,7 +416,6 @@ def main():
 
     def predict_full_posterior(models, loader, size, compute_acc=False):
 
-        m_logits = []
 
         if opts.dev_run:
             true_targets = np.zeros((opts.batch_size, 512, 512))
@@ -431,6 +430,8 @@ def main():
                 break
 
         print(true_targets.shape)
+        m_logits = []
+        
         for model_idx, m in enumerate(models):
             m_preds = []
             for batch in enumerate(loader):
