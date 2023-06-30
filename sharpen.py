@@ -203,11 +203,9 @@ def main():
         opts.num_classes = 2 # foreground + background
 
     project_name = "sharpen"
-    model_desc = opts.model_desc + "_sharpen"
     if not opts.dev_run:
         wandb.init(
             project=project_name,
-            name=model_desc,
             config={
                 "name": opts.model_desc,
                 "learning_rate": opts.lr,
@@ -216,6 +214,7 @@ def main():
         )
 
         print(f"Running new experiment under {project_name} named: {wandb.run.name}")
+        model_desc = wandb.run.name
         # if os.path.exists(f"moments/{model_desc}"):
         #     print("[ERROR] {model_desc} already exists. Aborting.")
         #     exit()
@@ -431,7 +430,7 @@ def main():
 
         print(true_targets.shape)
         m_logits = []
-        
+
         for model_idx, m in enumerate(models):
             m_preds = []
             for batch in enumerate(loader):
