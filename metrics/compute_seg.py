@@ -187,7 +187,6 @@ if __name__ == '__main__':
             Rec_scores.append(Rec_set)
             acc_scores.append(acc)
             # Hfd_score.append(Hf)
-            
         
         jac_scores = np.vstack(jac_scores)
         dice_scores = np.vstack(dice_scores)

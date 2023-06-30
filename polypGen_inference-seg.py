@@ -250,7 +250,6 @@ if __name__ == '__main__':
 
         # # set folder to save your checkpoints here!
         # saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
-=
 
         imgfiles = detect_imgs(imgfolder, ext='.jpg')
     
