@@ -563,6 +563,7 @@ def main():
             m_preds = []
             for batch in enumerate(loader):
                 batch_idx, (images, labels, idxes) = batch
+                images = images.to(device)
 
                 outputs = model(images)
                 preds_batch = outputs.detach().max(dim=1)[1].cpu().numpy()*255
@@ -580,23 +581,24 @@ def main():
         # [N_SAMPLES, 512, 512]
         m_preds = np.mean(m_logits, axis=0)
 
-        temp = (m_logits - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
-        epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
-        epis_ = epis_.astype(np.double)
+        #temp = (m_logits - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
+        #epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
+        #epis_ = epis_.astype(np.double)
+        epis = np.var(m_logits, axis=0)
 
         # [N_SAMPLES, 512, 512]
-        print("epis_.shape before collapse", epis_.shape)
+        #print("epis_.shape before collapse", epis_.shape)
         # take max or mean?
-        epis = epis_.mean(axis=(1, 2))
+        #epis = epis_.mean(axis=(1, 2))
         print("epis.shape", epis.shape)
 
         if compute_acc:
-            metrics.reset()
+            #metrics.reset()
             # compute useful metrics on validation set... 
-            metrics.update(true_targets, m_preds)
+            #metrics.update(true_targets.astype(np.int), m_preds)
 
-            score = metrics.get_results()
-            return score, m_preds, epis_, true_targets
+            #score = metrics.get_results()
+            return m_preds, epis, true_targets
         else:
             return m_preds, epis
     
@@ -749,15 +751,15 @@ def main():
 
     if opts.cycles == 0:
         print("[INFO] cut straight to predicting.")
-        score, m_preds, epis, targets = predict_full_posterior(
+        m_preds, epis, targets = predict_full_posterior(
                 model,
                 train_loader,
                 len(train_dst),
                 device,
                 compute_acc=True
         )
-        for key, value in score.items():
-            print(f"{key}:   {value}")
+        #for key, value in score.items():
+        #    print(f"{key}:   {value}")
 
         moment_dir = f"{opts.root}/moments/{opts.model_desc}/"
 

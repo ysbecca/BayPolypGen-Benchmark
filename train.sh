@@ -32,4 +32,5 @@ python main_polypGen.py \
 	--model_desc "driven-sun-53" \
 	--moment_count 8 \
 	--model "deeplabv3plus_resnet50" \
-	--root "/usr/not-backed-up/BayPolypGen-Benchmark/"
+	--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
+	#	--root "/usr/not-backed-up/BayPolypGen-Benchmark/"
