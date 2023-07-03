@@ -259,7 +259,7 @@ if __name__ == '__main__':
           imgfolder += f"datasets/endocv2021-test-noCopyAllowed-v3_confidential/" + subDirs[j]
 
         # # set folder to save your checkpoints here!
-        saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
+        #saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
 
         imgfiles = detect_imgs(imgfolder, ext='.jpg')
     
