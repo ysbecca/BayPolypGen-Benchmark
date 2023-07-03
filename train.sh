@@ -34,3 +34,4 @@ python main_polypGen.py \
 	--model "deeplabv3plus_resnet50" \
 	--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 	#	--root "/usr/not-backed-up/BayPolypGen-Benchmark/"
+	--lr 0.1 

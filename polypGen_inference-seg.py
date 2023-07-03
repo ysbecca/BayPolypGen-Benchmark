@@ -254,12 +254,12 @@ if __name__ == '__main__':
         else:
             imgfolder = opts.root
         if opts.test_set == "C6_pred":
-          imgfolder += f"datasets/EndoCV2021/data_C6/" + subDirs[j]
+          imgfolder += f"datasets/EndoCV2021/data_C6/images_C6/"
         else:
           imgfolder += f"datasets/endocv2021-test-noCopyAllowed-v3_confidential/" + subDirs[j]
 
         # # set folder to save your checkpoints here!
-        saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
+        #saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
 
         imgfiles = detect_imgs(imgfolder, ext='.jpg')
     
