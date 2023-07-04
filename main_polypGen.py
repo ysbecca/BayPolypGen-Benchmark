@@ -563,6 +563,7 @@ def main():
             m_preds = []
             for batch in enumerate(loader):
                 batch_idx, (images, labels, idxes) = batch
+                images = images.to(device)
 
                 outputs = model(images)
                 preds_batch = outputs.detach().max(dim=1)[1].cpu().numpy()*255
@@ -580,9 +581,7 @@ def main():
         # [N_SAMPLES, 512, 512]
         m_preds = np.mean(m_logits, axis=0)
 
-        temp = (m_logits - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
-        epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
-        epis_ = epis_.astype(np.double)
+        epis = np.var(m_logits, axis=0)
 
         # [N_SAMPLES, 512, 512]
         print("epis_.shape before collapse", epis_.shape)
@@ -593,7 +592,7 @@ def main():
         if compute_acc:
             metrics.reset()
             # compute useful metrics on validation set... 
-            metrics.update(true_targets, m_preds)
+            # metrics.update(true_targets.astype(np.int), m_preds)
 
             score = metrics.get_results()
             return score, m_preds, epis_, true_targets
