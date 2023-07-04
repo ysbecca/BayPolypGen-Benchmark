@@ -26,6 +26,7 @@ conda activate pyvis
 
 
 # test run to save train epis only
+
 python main_polypGen.py \
 	--cycle_length 0 \
 	--cycles 0 \
@@ -33,3 +34,4 @@ python main_polypGen.py \
 	--moment_count 8 \
 	--model "deeplabv3plus_resnet50" \
 	--root "/usr/not-backed-up/BayPolypGen-Benchmark/"
+	--lr 0.1 

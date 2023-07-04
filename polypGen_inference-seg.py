@@ -254,12 +254,12 @@ if __name__ == '__main__':
         else:
             imgfolder = opts.root
         if opts.test_set == "C6_pred":
-          imgfolder += f"datasets/EndoCV2021/data_C6/" + subDirs[j]
+          imgfolder += f"datasets/EndoCV2021/data_C6/images_C6/"
         else:
           imgfolder += f"datasets/endocv2021-test-noCopyAllowed-v3_confidential/" + subDirs[j]
 
         # # set folder to save your checkpoints here!
-        saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
+        #saveDir = os.path.join(directoryName , subDirs[j]+'_pred')
 
         imgfiles = detect_imgs(imgfolder, ext='.jpg')
     
@@ -310,17 +310,22 @@ if __name__ == '__main__':
             m_preds = np.array(m_preds)
             # get epistemic uncertainties.... and average for single value 
             # accumulate epistemic uncertainties
-            temp = (m_preds - np.broadcast_to(np.mean(m_preds, axis=0), (opts.moment_count, *m_preds.shape)))**2
-            epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
-            epis_ = epis_.astype(np.double)
+            # temp = (m_preds - np.broadcast_to(np.mean(m_preds, axis=0), (opts.moment_count, *m_preds.shape)))**2
+            # epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
+            # epis_ = epis_.astype(np.double)
 
             # take mean
-            epi = epis_.max()
+            epi = np.var(m_preds, axis=0)
             all_epistemics.append(epi)
 
             # final averaged prediction seg map
             # [PRED_w, PRED_h]
             m_preds = np.mean(m_preds, axis=0)
+
+            # TODO
+            # force these masks to be a BINARY mask. take only where they agree!
+            m_preds = 
+
             img_mask = skimage.transform.resize(m_preds, (size[0], size[1]), anti_aliasing=True)
 
             pil_image = Image.fromarray(img_mask.astype(np.uint8))
@@ -328,9 +333,9 @@ if __name__ == '__main__':
 
             # imsave(saveDir +'/'+ filename +'_mask.jpg', img_mask.astype(np.uint8))
 
-    # all_epistemics = np.array(all_epistemics)
-    # np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
-    # print("epis saved. exiting.")
+    all_epistemics = np.array(all_epistemics)
+    np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
+    print("epis saved. exiting.")
     # file.write('%s -----> %s \n' % 
        # ('average_t', np.mean(timeappend)))
 
