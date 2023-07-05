@@ -42,3 +42,5 @@ do
 		let task_id=$task_id+1
 	done
 done
+
+# python sharpen.py --model_desc "driven-sun-53" --max_epochs 1 --moment_count 2 --batch_size 3 --lr 0.01 --dev_run True --root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"

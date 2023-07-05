@@ -135,7 +135,7 @@ class VOCSegmentation_polypGen2021(data.Dataset):
 
         
         if epi_dims:
-            self.p_hats = np.ones((epi_dims[0], len(self), epi_dims[1], epi_dims[2], epi_dims[3]))
+            self.p_hats = np.ones((epi_dims[0], len(self), epi_dims[2], epi_dims[3]))
         else:
             self.p_hats = None
 

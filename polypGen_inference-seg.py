@@ -317,11 +317,17 @@ if __name__ == '__main__':
             # take mean
             #epi = epis_.max()
             epi = np.var(m_preds.astype(np.float32), axis=0)
+            # temp = (m_preds - np.broadcast_to(np.mean(m_preds, axis=0), (opts.moment_count, *m_preds.shape)))**2
+            # epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
+            # epis_ = epis_.astype(np.double)
+
+            # take mean
             all_epistemics.append(epi)
 
             # final averaged prediction seg map
             # [PRED_w, PRED_h]
             m_preds = np.mean(m_preds, axis=0)
+
             img_mask = skimage.transform.resize(m_preds, (size[0], size[1]), anti_aliasing=True)
 
             pil_image = Image.fromarray(img_mask.astype(np.uint8))

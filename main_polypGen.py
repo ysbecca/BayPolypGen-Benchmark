@@ -507,10 +507,15 @@ def main():
 
     def standard_loss(outputs, labels, criterion, weights=[], device=None):
         if len(weights):
-            loss = F.cross_entropy(outputs, labels, reduction="none")
-            adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
+            # torch.Size([16, 2, 512, 512])
+            # torch.Size([16, 512, 512])
 
-            loss *= adj_w
+            # [16, 512, 512]
+            loss = F.cross_entropy(outputs, labels, reduction="none")
+            loss *= weights.to(device)
+
+            # adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
+
             return loss.sum() / len(labels)
         else:
             return F.cross_entropy(outputs, labels)
@@ -595,7 +600,7 @@ def main():
             #metrics.reset()
             # compute useful metrics on validation set... 
             #metrics.update(true_targets.astype(np.int), m_preds)
-
+            # metrics.update(true_targets.astype(np.int), m_preds)
             #score = metrics.get_results()
             return m_preds, epis, true_targets
         else:
@@ -643,7 +648,7 @@ def main():
 
                 # save in correct indices
                 # [moment_id, idxes, 2, 512, 512]
-                train_dst.p_hats[moment_id][idxes.cpu()] = outputs.detach().cpu().numpy()
+                train_dst.p_hats[moment_id][idxes.cpu()] = outputs.detach().max(dim=1)[1].cpu().numpy()*255
 
             # if not first cycle, use epis for dynamic upweighting
             if opts.epiupwt and (cur_epochs > opts.cycle_length):
@@ -651,12 +656,15 @@ def main():
                 p_hats = train_dst.p_hats[:, idxes.cpu()]
                 p_bars = p_hats.mean(axis=0)
 
-                temp = (p_hats - np.broadcast_to(p_bars, (opts.models_per_cycle, *p_bars.shape)))**2
-                epistemics = np.sqrt(np.sum(temp, axis=0)) / opts.models_per_cycle
-                # [models per cycle, batch, 2, 512, 512]
-                epistemics = epistemics.astype(np.double)
-                condensed_epis = np.mean(np.max(epistemics, axis=1), axis=(1, 2))
-                weights = weighting_function(condensed_epis)
+                # temp = (p_hats - np.broadcast_to(p_bars, (opts.models_per_cycle, *p_bars.shape)))**2
+                # epistemics = np.sqrt(np.sum(temp, axis=0)) / opts.models_per_cycle
+                
+                # [batch, 512, 512]
+                epistemics = np.var(p_hats.astype(np.float32), axis=0)
+                print("epistemics.shape", epistemics.shape)
+                # condensed_epis = np.mean(np.max(epistemics, axis=1), axis=(1, 2
+                # [batch, 512, 512]
+                weights = weighting_function(epistemics)
 
             # =============== LOSS ======================
             loss = standard_loss(outputs, labels, criterion, weights, device)
