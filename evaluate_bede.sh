@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --account=bdlds05
-#SBATCH --time=0:30:0
+#SBATCH --time=3:00:0
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --array=1-4
+#SBATCH --array=0
 
 module load cuda
 
@@ -14,12 +14,10 @@ conda activate pyvis
 export WANDB_MODE=online
 
 # TODO 1: fill in the MODELS list with all the string model descs you want to evaluate
-MODELS=("stellar-deluge-24" \
-	"smart-haze-24" \
-	"hearty-grass-22" \
-	"expert-moon-23" \
-	"olive-lion-21" \
+MODELS=("worthy-sky-26" \
 )
+
+DATASETS=("EndoCV_DATA3")
 
 # TODO 2: fill in these paths
 export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
@@ -31,23 +29,29 @@ task_id=0
 
 for model in "${MODELS[@]}"
 do
-	if [ $task_id = $SLURM_ARRAY_TASK_ID ]
-	then
-		python polypGen_inference-seg.py \
-			--moment_count 6 \
-			--model_desc $model \
-			--root $ROOT
+	for dst in "${DATASETS[@]}"
+	do
+		if [ $task_id = $SLURM_ARRAY_TASK_ID ]
+		then
+			python polypGen_inference-seg.py \
+				--moment_count 8 \
+				--test_set $dst \
+				--model_desc $model \
+				--root $ROOT
 
-		# this logs test metrics to wandb
-		python metrics/compute_seg.py \
-			--model_desc $model \
-			--root $ROOT
+			# this logs test metrics to wandb
+			python metrics/compute_seg.py \
+				--model_desc $model \
+				--test_set $dst \
+				--root $ROOT
 
-		echo "inference and evaluation done."
-		echo $model
-		exit 0
-	fi
-	let task_id=$task_id+1
+			echo "inference and evaluation done."
+			echo $model
+			echo $dst
+			exit 0
+		fi
+		let task_id=$task_id+1
+	done
 done
 
 # python polypGen_inference-seg.py --moment_count 7 --model_desc "driven-sun-53" --root /users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/

@@ -30,7 +30,6 @@ from collections import OrderedDict
 
 import random
 import string
-from nltk.corpus import words
 
 def plotInference( imgs, depth):
     f =  plt.figure()
