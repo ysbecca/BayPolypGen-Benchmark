@@ -29,9 +29,8 @@ conda activate pyvis
 python main_polypGen.py \
 	--cycle_length 0 \
 	--cycles 0 \
-	--model_desc "driven-sun-53" \
-	--moment_count 8 \
+	--model_desc "splendid-yogurt-28" \
+	--moment_count 7 \
 	--model "deeplabv3plus_resnet50" \
 	--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 	#	--root "/usr/not-backed-up/BayPolypGen-Benchmark/"
-	--lr 0.1 

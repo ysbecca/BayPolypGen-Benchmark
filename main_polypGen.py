@@ -583,7 +583,7 @@ def main():
         #temp = (m_logits - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
         #epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
         #epis_ = epis_.astype(np.double)
-        epis = np.var(m_logits, axis=0)
+        epis = np.var(m_logits.astype(np.float32), axis=0)
 
         # [N_SAMPLES, 512, 512]
         #print("epis_.shape before collapse", epis_.shape)

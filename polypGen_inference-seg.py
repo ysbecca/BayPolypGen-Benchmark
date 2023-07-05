@@ -24,10 +24,10 @@ import matplotlib.pyplot as plt
 def create_predFolder(root, model_desc, test_data=None):
     #path = f"{root}predictions/images_C6_pred/{model_desc}/"
     #if test_data:
-    folder_path = f"{root}predictions/images_{test_data}/"
+    folder_path = f"{root}/predictions/images_{test_data}/"
     if not os.path.exists(folder_path):
       os.mkdir(folder_path)
-    path = f"{root}predictions/images_{test_data}/{model_desc}/"
+    path = f"{root}/predictions/images_{test_data}/{model_desc}/"
     if not os.path.exists(path):
       os.mkdir(path)
         
@@ -179,7 +179,7 @@ def mymodel():
 
 def load_moment(moment_id, model, device):
 
-    checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
+    checkpoint = torch.load(f"{opts.root}moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
     state_dict = checkpoint['model_state']
 
     try:
@@ -310,12 +310,13 @@ if __name__ == '__main__':
             m_preds = np.array(m_preds)
             # get epistemic uncertainties.... and average for single value 
             # accumulate epistemic uncertainties
-            temp = (m_preds - np.broadcast_to(np.mean(m_preds, axis=0), (opts.moment_count, *m_preds.shape)))**2
-            epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
-            epis_ = epis_.astype(np.double)
+            #temp = (m_preds - np.broadcast_to(np.mean(m_preds, axis=0), (opts.moment_count, *m_preds.shape)))**2
+            #epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
+            #epis_ = epis_.astype(np.double)
 
             # take mean
-            epi = epis_.max()
+            #epi = epis_.max()
+            epi = np.var(m_preds.astype(np.float32), axis=0)
             all_epistemics.append(epi)
 
             # final averaged prediction seg map
@@ -328,9 +329,9 @@ if __name__ == '__main__':
 
             # imsave(saveDir +'/'+ filename +'_mask.jpg', img_mask.astype(np.uint8))
 
-    # all_epistemics = np.array(all_epistemics)
-    # np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
-    # print("epis saved. exiting.")
+    all_epistemics = np.array(all_epistemics)
+    np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
+    print("epis saved. exiting.")
     # file.write('%s -----> %s \n' % 
        # ('average_t', np.mean(timeappend)))
 
