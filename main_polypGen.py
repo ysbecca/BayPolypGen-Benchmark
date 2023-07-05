@@ -512,10 +512,16 @@ def main():
 
             print(outputs.shape)
             print(labels.shape)
-            exit()
+            # [16, 512, 512]
             loss = F.cross_entropy(outputs, labels, reduction="none")
+            print(loss.shape)
+            print(weights.shape)
+            loss *= weights
+            print(loss.shape)
+            exit()
+
             # TODO tonight: cross entropy reduces to a single value across whole image
-            adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
+            # adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
 
             return loss.sum() / len(labels)
         else:
@@ -660,8 +666,8 @@ def main():
                 # [batch, 512, 512]
                 epistemics = np.var(p_hats.astype(np.float32), axis=0)
                 print(epistemics.shape)
-                # condensed_epis = np.mean(np.max(epistemics, axis=1), axis=(1, 2))
-
+                # condensed_epis = np.mean(np.max(epistemics, axis=1), axis=(1, 2
+                # [batch, 512, 512]
                 weights = weighting_function(epistemics)
 
             # =============== LOSS ======================
