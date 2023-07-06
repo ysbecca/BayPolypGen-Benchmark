@@ -510,12 +510,11 @@ def main():
             # torch.Size([16, 2, 512, 512])
             # torch.Size([16, 512, 512])
 
-            print(outputs.shape)
-            print(labels.shape)
-            exit()
+            # [16, 512, 512]
             loss = F.cross_entropy(outputs, labels, reduction="none")
-            # TODO tonight: cross entropy reduces to a single value across whole image
-            adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
+            loss *= weights.to(device)
+
+            # adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
 
             return loss.sum() / len(labels)
         else:
@@ -586,21 +585,24 @@ def main():
         # [N_SAMPLES, 512, 512]
         m_preds = np.mean(m_logits, axis=0)
 
-        epis = np.var(m_logits, axis=0)
+        #temp = (m_logits - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
+        #epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
+        #epis_ = epis_.astype(np.double)
+        epis = np.var(m_logits.astype(np.float32), axis=0)
 
         # [N_SAMPLES, 512, 512]
-        print("epis_.shape before collapse", epis_.shape)
+        #print("epis_.shape before collapse", epis_.shape)
         # take max or mean?
-        epis = epis_.mean(axis=(1, 2))
+        #epis = epis_.mean(axis=(1, 2))
         print("epis.shape", epis.shape)
 
         if compute_acc:
-            metrics.reset()
+            #metrics.reset()
             # compute useful metrics on validation set... 
+            #metrics.update(true_targets.astype(np.int), m_preds)
             # metrics.update(true_targets.astype(np.int), m_preds)
-
-            score = metrics.get_results()
-            return score, m_preds, epis_, true_targets
+            #score = metrics.get_results()
+            return m_preds, epis, true_targets
         else:
             return m_preds, epis
     
@@ -659,13 +661,12 @@ def main():
                 
                 # [batch, 512, 512]
                 epistemics = np.var(p_hats.astype(np.float32), axis=0)
-                print(epistemics.shape)
-                # condensed_epis = np.mean(np.max(epistemics, axis=1), axis=(1, 2))
-
+                print("epistemics.shape", epistemics.shape)
+                # condensed_epis = np.mean(np.max(epistemics, axis=1), axis=(1, 2
+                # [batch, 512, 512]
                 weights = weighting_function(epistemics)
 
             # =============== LOSS ======================
-            weights = torch.ones((16, 512, 512))
             loss = standard_loss(outputs, labels, criterion, weights, device)
             lr = adjust_learning_rate(model, batch_idx, optimizer, cur_epochs)
             if not opts.dev_run:
@@ -757,15 +758,15 @@ def main():
 
     if opts.cycles == 0:
         print("[INFO] cut straight to predicting.")
-        score, m_preds, epis, targets = predict_full_posterior(
+        m_preds, epis, targets = predict_full_posterior(
                 model,
                 train_loader,
                 len(train_dst),
                 device,
                 compute_acc=True
         )
-        for key, value in score.items():
-            print(f"{key}:   {value}")
+        #for key, value in score.items():
+        #    print(f"{key}:   {value}")
 
         moment_dir = f"{opts.root}/moments/{opts.model_desc}/"
 
