@@ -302,7 +302,7 @@ def main():
                 "alpha": opts.alpha,
                 "kappa": opts.kappa,
                 "models_per_cycle": opts.models_per_cycle,
-            }
+            }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
         )
 
         model_desc = wandb.run.name
@@ -472,7 +472,7 @@ def main():
 
         return noise_loss
 
-    total_itrs = opts.cycle_length * num_batches
+    total_itrs = opts.cycle_length * num_batches * opts.cycles
     print(f"[INFO] total itrs {total_itrs}")
 
     def adjust_learning_rate(model, batch_idx, optim, current_epoch):
