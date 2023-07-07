@@ -82,6 +82,8 @@ def get_argparser():
                         help="path to Dataset")
     parser.add_argument("--dataset", type=str, default='polypGen',
                         choices=['polypGen'], help='Name of dataset')
+    parser.add_argument("--extra_C6", type=int, default=0,
+                        help="how many extra C6 images to add to training set (for bias setup)")
     parser.add_argument("--num_classes", type=int, default=2,
                         help="num classes (default: None)")
     parser.add_argument("--download", action='store_true', default=False,
@@ -196,6 +198,7 @@ def get_dataset(opts):
         transform=train_transform,
         epi_dims=epi_dims,
         indices=indices,
+        extra_C6=opts.extra_C6,
     )
 
     val_dst = polyGenSeg(
@@ -302,6 +305,7 @@ def main():
                 "alpha": opts.alpha,
                 "kappa": opts.kappa,
                 "models_per_cycle": opts.models_per_cycle,
+                "extra_C6_count": opts.extra_C6,
             }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
         )
 
@@ -472,7 +476,7 @@ def main():
 
         return noise_loss
 
-    total_itrs = opts.cycle_length * num_batches * opts.cycles
+    total_itrs = opts.cycle_length * num_batches
     print(f"[INFO] total itrs {total_itrs}")
 
     def adjust_learning_rate(model, batch_idx, optim, current_epoch):

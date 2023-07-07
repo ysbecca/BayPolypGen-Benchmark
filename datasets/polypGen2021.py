@@ -86,7 +86,8 @@ class VOCSegmentation_polypGen2021(data.Dataset):
                  epi_dims=None,
                  indices=False,
                  transform=None,
-                 min_c6=False):
+                 extra_C6=0,
+                ):
         
         self.root = os.path.expanduser(root)
         self.transform = transform
@@ -121,18 +122,21 @@ class VOCSegmentation_polypGen2021(data.Dataset):
         self.masks = [os.path.join(mask_dir, x + "_mask.jpg") for x in file_names]
 
 
-        # if min_c6:
-        #     # read text file
-        #     min_c6_path = os.path.join(splits_dir, min_c6 + '.txt')
-        #     with open(os.path.join(min_c6_path), "r") as f:
-        #         file_names = [x.strip() for x in f.readlines()]
+        if extra_C6:
+            # read text file
+            extra_C6_path = os.path.join(self.root, 'datasets/extra_C6/')
+            with open(os.path.join(extra_C6_path + "images"), "r") as f:
+                file_names = [x.strip() for x in f.readlines()]
+            with open(os.path.join(extra_C6_path + "masks"), "r") as f:
+                mask_names = [x.strip() for x in f.readlines()]
 
-            # TODO set mask and image dirs
-            # add those images and masks from file_names to the class variables
-
-            # TODO add flag in the main for training....
-            # TODO save train set uncertainties after first sampling phase
-
+            file_names.sort()
+            mask_names.sort()
+            print(file_names)
+            print(mask_names)
+            for i in range(extra_C6):
+                self.images.append(f"{extra_C6_path}images/{file_names[i]}.jpg")
+                self.masks.append(f"{extra_C6_path}masks/{mask_names[i]}.jpg")
         
         if epi_dims:
             self.p_hats = np.ones((epi_dims[0], len(self), epi_dims[2], epi_dims[3]))
