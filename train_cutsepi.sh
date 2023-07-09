@@ -37,6 +37,7 @@ do
 				--alpha 0.9 \
 				--cycles 1 \
 				--kappa $k \
+				--epiupwt True \
 				--extra_C6 $c \
 				--models_per_cycle 10 \
 				--model "deeplabv3plus_resnet50" \
