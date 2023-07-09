@@ -1,4 +1,5 @@
 import os
+import glob
 import sys
 import tarfile
 import collections
@@ -124,19 +125,17 @@ class VOCSegmentation_polypGen2021(data.Dataset):
 
         if extra_C6:
             # read text file
-            extra_C6_path = os.path.join(self.root, 'datasets/extra_C6/')
-            with open(os.path.join(extra_C6_path + "images"), "r") as f:
-                file_names = [x.strip() for x in f.readlines()]
-            with open(os.path.join(extra_C6_path + "masks"), "r") as f:
-                mask_names = [x.strip() for x in f.readlines()]
+            extra_C6_path = self.root + 'C6_additional'
+            img_names = glob.glob(extra_C6_path + "/images/*.jpg")
+            mask_names = glob.glob(extra_C6_path + "/masks/*.jpg")
 
-            file_names.sort()
-            mask_names.sort()
-            print(file_names)
-            print(mask_names)
+            print(len(img_names))
+            print(img_names[0])
+            print(len(mask_names))
+            print(mask_names[0])
             for i in range(extra_C6):
-                self.images.append(f"{extra_C6_path}images/{file_names[i]}.jpg")
-                self.masks.append(f"{extra_C6_path}masks/{mask_names[i]}.jpg")
+                self.images.append(img_names[i])
+                self.masks.append(mask_names[i])
         
         if epi_dims:
             self.p_hats = np.ones((epi_dims[0], len(self), epi_dims[2], epi_dims[3]))
