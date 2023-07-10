@@ -9,7 +9,7 @@
 module load cuda
 source /nobackup/projects/bdlds05/rsstone/miniconda/etc/profile.d/conda.sh
 conda activate pyvis
-
+echo "b"
 export WANDB_MODE=online
 export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 
