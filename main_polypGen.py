@@ -337,7 +337,7 @@ def main():
         opts.val_batch_size = 1
     
     train_dst, val_dst = get_dataset(opts)
-    
+     
     # don't shuffle if just doing inference on train/val sets
     shuffle = True if opts.cycles else False
 
@@ -347,6 +347,7 @@ def main():
         val_dst, batch_size=opts.val_batch_size, shuffle=True, num_workers=2)
     print("Dataset: %s, Train set: %d, Val set: %d" %
           (opts.dataset, len(train_dst), len(val_dst)))
+
 
     # for tempering
     train_size = len(train_dst)
