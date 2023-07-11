@@ -1,4 +1,5 @@
 import os
+import glob
 import sys
 import tarfile
 import collections
@@ -84,7 +85,10 @@ class VOCSegmentation_polypGen2021(data.Dataset):
                  image_set='train',
                  download=False,
                  epi_dims=None,
-                 transform=None):
+                 indices=False,
+                 transform=None,
+                 extra_C6=0,
+                ):
         
         self.root = os.path.expanduser(root)
         self.transform = transform
@@ -117,13 +121,29 @@ class VOCSegmentation_polypGen2021(data.Dataset):
         mask_dir = os.path.join(self.root, 'masks_polypGen')
         self.images = [os.path.join(image_dir, x + ".jpg") for x in file_names]
         self.masks = [os.path.join(mask_dir, x + "_mask.jpg") for x in file_names]
+
+
+        if extra_C6:
+            # read text file
+            extra_C6_path = self.root + 'C6_additional'
+            img_names = glob.glob(extra_C6_path + "/images/*.jpg")
+            mask_names = glob.glob(extra_C6_path + "/masks/*.jpg")
+
+            print(len(img_names))
+            print(img_names[0])
+            print(len(mask_names))
+            print(mask_names[0])
+            for i in range(extra_C6):
+                self.images.append(img_names[i])
+                self.masks.append(mask_names[i])
         
         if epi_dims:
-            self.p_hats = np.ones((epi_dims[0], len(self), epi_dims[1], epi_dims[2], epi_dims[3]))
+            self.p_hats = np.ones((epi_dims[0], len(self), epi_dims[2], epi_dims[3]))
         else:
             self.p_hats = None
 
         self.track_epi = epi_dims
+        self.indices = indices
 
         assert (len(self.images) == len(self.masks))
 
@@ -144,7 +164,7 @@ class VOCSegmentation_polypGen2021(data.Dataset):
         if self.transform is not None:
             img, target = self.transform(img, target)
 
-        if self.track_epi:
+        if self.track_epi or self.indices:
             return img, target, index
         else:
             return img, target

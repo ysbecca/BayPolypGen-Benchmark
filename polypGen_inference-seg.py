@@ -24,10 +24,10 @@ import matplotlib.pyplot as plt
 def create_predFolder(root, model_desc, test_data=None):
     #path = f"{root}predictions/images_C6_pred/{model_desc}/"
     #if test_data:
-    folder_path = f"{root}predictions/images_{test_data}/"
+    folder_path = f"{root}/predictions/images_{test_data}/"
     if not os.path.exists(folder_path):
       os.mkdir(folder_path)
-    path = f"{root}predictions/images_{test_data}/{model_desc}/"
+    path = f"{root}/predictions/images_{test_data}/{model_desc}/"
     if not os.path.exists(path):
       os.mkdir(path)
         
@@ -53,7 +53,6 @@ def get_argparser():
                         help="num classes (default: None)")
 
     # Deeplab Options
-    
     parser.add_argument("--model", type=str, default='deeplabv3plus_resnet50',
                         choices=['deeplabv3_resnet50',  'deeplabv3plus_resnet50',
                                  'deeplabv3_resnet101', 'deeplabv3plus_resnet101',
@@ -74,7 +73,7 @@ def get_argparser():
     
     parser.add_argument("--crop_size", type=int, default=512)
     
-    "Sent as an argument so see the script file instead!!!"
+    # "Sent as an argument so see the script file instead!!!"
     parser.add_argument("--ckpt", type=str, default='./checkpoints/best_deeplabv3plus_resnet50_voc_os16_kvasir.pth',
                         help="checkpoint file")
 
@@ -249,6 +248,7 @@ if __name__ == '__main__':
         
         # ---> Folder for test data location!!! (Warning!!! do not copy/visulise!!!)
         #imgfolder='/well/rittscher/users/sharib/deepLabv3_plus_pytorch/datasets/endocv2021-test-noCopyAllowed-v3/' + subDirs[j]
+
         if not opts.root:
             imgfolder = '/resstore/b0211/Users/scpecs/' 
         else:
@@ -296,12 +296,10 @@ if __name__ == '__main__':
             for m in range(opts.moment_count):
                 model = load_moment(m, model, device)
 
-
                 outputs = model(images.unsqueeze(0))
                 pred = outputs.detach().max(dim=1)[1].cpu().numpy()[0]*255
                 pred = pred.astype(np.uint8)
                 m_preds.append(pred)
-
 
             # end.record()
             # torch.cuda.synchronize()
@@ -312,17 +310,24 @@ if __name__ == '__main__':
             m_preds = np.array(m_preds)
             # get epistemic uncertainties.... and average for single value 
             # accumulate epistemic uncertainties
-            temp = (m_preds - np.broadcast_to(m_preds, (opts.moment_count, *m_preds.shape)))**2
-            epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
-            epis_ = epis_.astype(np.double)
+            #temp = (m_preds - np.broadcast_to(np.mean(m_preds, axis=0), (opts.moment_count, *m_preds.shape)))**2
+            #epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
+            #epis_ = epis_.astype(np.double)
 
             # take mean
-            epi = epis_.max()
+            #epi = epis_.max()
+            epi = np.var(m_preds.astype(np.float32), axis=0)
+            # temp = (m_preds - np.broadcast_to(np.mean(m_preds, axis=0), (opts.moment_count, *m_preds.shape)))**2
+            # epis_ = np.sqrt(np.sum(temp, axis=0)) / opts.moment_count
+            # epis_ = epis_.astype(np.double)
+
+            # take mean
             all_epistemics.append(epi)
 
             # final averaged prediction seg map
             # [PRED_w, PRED_h]
             m_preds = np.mean(m_preds, axis=0)
+
             img_mask = skimage.transform.resize(m_preds, (size[0], size[1]), anti_aliasing=True)
 
             pil_image = Image.fromarray(img_mask.astype(np.uint8))
@@ -331,6 +336,7 @@ if __name__ == '__main__':
             # imsave(saveDir +'/'+ filename +'_mask.jpg', img_mask.astype(np.uint8))
 
     all_epistemics = np.array(all_epistemics)
+
     if opts.test_set == "C6_pred":
       np.save(f"{saveDir}/epis_images_C6.npy", all_epistemics)
     else:

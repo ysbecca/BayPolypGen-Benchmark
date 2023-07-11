@@ -112,8 +112,8 @@ if __name__ == '__main__':
     if not args.dev_run:
        wandb.init(
          project = "inference",
+         name = args.model_desc,
          config  = {
-           "name": args.model_desc,
            "test_data": args.test_set
          }
        )
