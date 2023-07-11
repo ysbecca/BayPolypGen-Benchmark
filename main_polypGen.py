@@ -3,6 +3,7 @@ import network
 import utils
 import os
 import random
+import math
 import argparse
 import numpy as np
 
@@ -349,7 +350,7 @@ def main():
 
     # for tempering
     train_size = len(train_dst)
-    num_batches = train_size / opts.batch_size + 1
+    num_batches = math.ceil(train_size / opts.batch_size)
 
     # Set up model
     if opts.model == 'pspNet':
@@ -476,11 +477,11 @@ def main():
 
         return noise_loss
 
-    total_itrs = opts.cycle_length * num_batches
+    total_itrs = opts.cycle_length * num_batches * opts.cycles
     print(f"[INFO] total itrs {total_itrs}")
 
     def adjust_learning_rate(model, batch_idx, optim, current_epoch):
-        rcounter = (current_epoch) * num_batches + batch_idx
+        rcounter = current_epoch * num_batches + batch_idx
 
         cos_inner = np.pi * (rcounter % (total_itrs // opts.cycles))
         cos_inner /= total_itrs // opts.cycles
@@ -753,12 +754,11 @@ def main():
             save_moment(model, moment_count)
             moment_count += 1
 
-        cur_epochs += 1 
+        cur_epochs += 1
 
-        if cur_epochs > (opts.cycle_length * opts.cycles):
+        if cur_epochs >= (opts.cycle_length * opts.cycles):
             break
-        
-            
+
 
     if opts.cycles == 0:
         print("[INFO] cut straight to predicting.")
