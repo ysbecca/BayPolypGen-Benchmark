@@ -291,9 +291,9 @@ def main():
     model_desc = ""
     name = None
     if not opts.dev_run and opts.cycles > 0:        
-        project_name = "baybaseline"
+        project_name = "baybaseline_1"
         if opts.epiupwt:
-            project_name = "epiupwt"
+            project_name = "epiupwt_1"
             name = opts.model_desc
 
         wandb.init(

@@ -4,7 +4,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-3
+#SBATCH --array=0-4
 
 module load cuda
 source /nobackup/projects/bdlds05/rsstone/miniconda/etc/profile.d/conda.sh
@@ -14,9 +14,10 @@ export WANDB_MODE=online
 export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 
 CUTS=(116 \
-	58 \
+	59 \
 	29 \
 	15 \
+	0 \
 )
 
 task_id=0
@@ -26,8 +27,6 @@ do
 	if [ $task_id = $SLURM_ARRAY_TASK_ID ]
 	then
 		echo $c
-		echo $k
-		echo $e
 		python main_polypGen.py \
 			--cycle_length 550 \
 			--alpha 0.9 \
