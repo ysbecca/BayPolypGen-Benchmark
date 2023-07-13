@@ -336,8 +336,12 @@ if __name__ == '__main__':
             # imsave(saveDir +'/'+ filename +'_mask.jpg', img_mask.astype(np.uint8))
 
     all_epistemics = np.array(all_epistemics)
-    np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
-    print("epis saved. exiting.")
+
+    if opts.test_set == "C6_pred":
+      np.save(f"{saveDir}/epis_images_C6.npy", all_epistemics)
+    else:
+      np.save(f"{saveDir}/epis_{subDirs[j]}.npy", all_epistemics)
+
     # file.write('%s -----> %s \n' % 
        # ('average_t', np.mean(timeappend)))
 
