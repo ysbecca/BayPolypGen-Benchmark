@@ -297,7 +297,7 @@ def main():
             name = opts.model_desc
 
         wandb.init(
-            project=project_name,
+            project="TEST",
             config={
                 "name": name,
                 "learning_rate": opts.lr,
@@ -513,16 +513,12 @@ def main():
 
     def standard_loss(outputs, labels, criterion, weights=[], device=None):
         if len(weights):
-            # torch.Size([16, 2, 512, 512])
-            # torch.Size([16, 512, 512])
-
             # [16, 512, 512]
             loss = F.cross_entropy(outputs, labels, reduction="none")
             loss *= weights.to(device)
+            print("final batch loss", loss.sum() / (512*512))
 
-            # adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
-
-            return loss.sum() / len(labels)
+            return loss.sum() / (len(labels)*512*512)
         else:
             return F.cross_entropy(outputs, labels)
 
@@ -648,9 +644,10 @@ def main():
 
             weights = []
 
-            if opts.epiupwt and (cur_epochs % opts.cycle_length + 1 == opts.cycle_length):
+            # save outputs if within sampling range.
+            if opts.epiupwt and ((cur_epochs % opts.cycle_length) + 1 > (opts.cycle_length - opts.models_per_cycle)):
                 # which index in cycle is this moment
-                moment_id = moment_count % opts.models_per_cycle
+                moment_id = cur_epochs % opts.cycle_length - (opts.cycle_length - opts.models_per_cycle)
 
                 # save in correct indices
                 # [moment_id, idxes, 2, 512, 512]
@@ -666,11 +663,13 @@ def main():
                 # epistemics = np.sqrt(np.sum(temp, axis=0)) / opts.models_per_cycle
                 
                 # [batch, 512, 512]
-                epistemics = np.var(p_hats.astype(np.float32), axis=0)
-                print("epistemics.shape", epistemics.shape)
+                epistemics = np.var(p_hats.astype(np.float32), axis=0) / (255*255.)
+                # print("epi max", epistemics.max(), "epi min", epistemics.min(), "mean", epistemics.mean())
+
                 # condensed_epis = np.mean(np.max(epistemics, axis=1), axis=(1, 2
                 # [batch, 512, 512]
                 weights = weighting_function(epistemics)
+                print("max", weights.max(), "min", weights.min())
 
             # =============== LOSS ======================
             loss = standard_loss(outputs, labels, criterion, weights, device)
@@ -687,6 +686,8 @@ def main():
                 loss.backward()
                 update_params(model, lr, cur_epochs)
 
+            if opts.epiupwt:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
 
             np_loss = loss.detach().cpu().numpy()
@@ -747,7 +748,7 @@ def main():
 
             if opts.dev_run: # single itr per epoch only on dev run
                 break
-            #if cur_itrs % 10 == 0:
+            # if cur_itrs % 2 == 0:
                # break
 
         # within sampling phase
