@@ -292,8 +292,9 @@ def main():
     
         model = model_map[opts.model](num_classes=opts.num_classes, output_stride=opts.output_stride) 
 
-    models = [model for m in range(opts.moment_count)]
-    print("Loaded models", len(models))
+    # models = [model for m in range(opts.moment_count)]
+
+    print("Loaded model", len(model))
 
     if opts.separable_conv and 'plus' in opts.model:
         network.convert_to_separable_conv(model.classifier)
@@ -364,20 +365,6 @@ def main():
 
         print(f"[{not opts.dev_run}] Model saved as {path}")    
 
-    def save_moment(model, moment_id, epoch=-1):
-        """ save moment checkpoint
-        """
-        path = f"{opts.root}/moments/{model_desc}/{moment_id}"
-        if epoch > -1:
-            path += f"_{epoch}s"
-
-        path += ".pt"
-
-        if not opts.dev_run:
-            torch.save({
-                "model_state": model.state_dict(),
-            }, path)
-        print(f"[{not opts.dev_run}] Model MOMENT {moment_id} saved")
 
     def standard_loss(outputs, labels, criterion, weights=[], device=None):
         if len(weights):
@@ -393,26 +380,50 @@ def main():
         return torch.pow((1.0 + torch.tensor(epistemics)), opts.kappa)
 
 
-    def load_moment(moment_id, model, device):
+    def save_moment(model, moment_id, epoch=-1):
+        """ save moment checkpoint
+        """
+        path = f"{opts.root}/moments/{model_desc}/{moment_id}"
+        if epoch > -1:
+            path += f"_{epoch}s"
 
-        checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
-        state_dict = checkpoint['model_state']
+        path += ".pt"
+
+        if not opts.dev_run:
+            torch.save({
+                "model_state": model.state_dict(),
+            }, path)
+        print(f"[{not opts.dev_run}] Model MOMENT-S {moment_id} saved")
+
+
+    def load_moment(moment_id, model, device, epoch=0):
+
+        if not epoch:
+            checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
+            state_dict = checkpoint['model_state']
+            
+            try:
+                model.load_state_dict(state_dict)
+            except:
+                new_state_dict = OrderedDict()
+                for k, v in state_dict.items():
+                    if 'module' not in k:
+                        k = 'module.'+k
+                    else:
+                        k = k.replace('features.module.', 'module.features.')
+                    new_state_dict[k]=v
+                model.load_state_dict(new_state_dict)
         
-        try:
+        else:
+            print(f'Loading {moment_id}_{epoch}s.pt')
+            checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}_{epoch}s.pt", map_location=device)
+            state_dict = checkpoint['model_state']
             model.load_state_dict(state_dict)
-        except:
-            new_state_dict = OrderedDict()
-            for k, v in state_dict.items():
-                if 'module' not in k:
-                    k = 'module.'+k
-                else:
-                    k = k.replace('features.module.', 'module.features.')
-                new_state_dict[k]=v
-            model.load_state_dict(new_state_dict)
+
         model.eval()
         return model
 
-    def predict_full_posterior(models, loader, size, compute_acc=False):
+    def predict_full_posterior(models, loader, size, compute_acc=False, epoch=0):
 
 
         if opts.dev_run:
@@ -430,7 +441,9 @@ def main():
         print(true_targets.shape)
         m_logits = []
 
-        for model_idx, m in enumerate(models):
+        for model_idx in range(opts.moment_count):
+            model = load_moment(model_idx, model.to(device), device, epoch=epoch)
+
             m_preds = []
             for batch in enumerate(loader):
                 batch_idx, (images, labels, idxes) = batch
@@ -478,25 +491,6 @@ def main():
     cur_itrs = 0
     cur_epochs = 0
 
-    # TODO rewrite for Bay version
-    # if opts.ckpt is not None and os.path.isfile(opts.ckpt):
-    #     checkpoint = torch.load(opts.ckpt, map_location=torch.device('cpu'))
-    #     model.load_state_dict(checkpoint["model_state"])
-    #     model = nn.DataParallel(model)
-    #     model.to(device)
-    #     if opts.continue_training:
-    #         optimizer.load_state_dict(checkpoint["optimizer_state"])
-    #         scheduler.load_state_dict(checkpoint["scheduler_state"])
-    #         cur_itrs = checkpoint["cur_itrs"]
-    #         best_score = checkpoint['best_score']
-    #         print("Training state restored from %s" % opts.ckpt)
-    #     print("Model restored from %s" % opts.ckpt)
-    #     del checkpoint  # free memory
-    # else:
-    #     print("[!] Retrain")
-    #     model = nn.DataParallel(model)
-    #     model.to(device)
-
     #==========   Train Loop   ==========#
     vis_sample_id = np.random.randint(0, len(val_loader), opts.vis_num_samples,
                                       np.int32) if (opts.enable_vis or opts.log_masks_wandb) else None 
@@ -504,7 +498,7 @@ def main():
     interval_loss = 0
 
     # assumes unshuffled set! only once on train
-    mean_preds, epis = predict_full_posterior(models, train_loader, len(train_dst))
+    mean_preds, epis = predict_full_posterior(models, train_loader, len(train_dst), epoch=0)
     weights = weighting_function(epis)
 
     train_loader = data.DataLoader(
@@ -512,8 +506,8 @@ def main():
     
     for e in range(opts.max_epochs):
         print("Epoch", e)
-        for moment_id, m in enumerate(models):
-            model = load_moment(moment_id, model.to(device), device)
+        for moment_id in range(opts.moment_count):
+            model = load_moment(moment_id, model.to(device), device, epoch=e)
 
             model.train()
             for batch in enumerate(train_loader):
@@ -550,12 +544,12 @@ def main():
             # save sharpened moment without overwriting.
             save_moment(model, model_idx, epoch=e)
 
-    score = predict_full_posterior(models, val_loader, len(val_dst), compute_acc=True)
+    score = predict_full_posterior(models, val_loader, len(val_dst), compute_acc=True, epoch=opts.moment_count)
+    
     if opts.dev_run:
         print(score)
     else:
         wandb.log(score)
-    
 
 
 if __name__ == '__main__':
