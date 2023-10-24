@@ -28,10 +28,11 @@ conda activate pyvis
 # test run to save train epis only
 
 python main_polypGen.py \
-	--cycle_length 1 \
-	--cycles 1 \
-	--extra_C6 116 \
+	--cycle_length 0 \
+	--cycles 0 \
+	--model_desc "fresh-paper-72" \
+	--moment_count 5 \
+	--extra_C6 29 \
 	--model "deeplabv3plus_resnet50" \
 	--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/" \
-	--lr 0.1 \
-        --dev_run True	
+	--lr 0.1

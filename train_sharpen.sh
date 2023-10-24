@@ -4,7 +4,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-2
+#SBATCH --array=0
 
 
 
@@ -20,7 +20,7 @@ export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 task_id=0
 
 BASELINE_MODELS=("driven-sun-53") #"legendary-moon-51")
-LRS=(0.1 0.05 0.01)
+LRS=(0.1) # 0.05 0.01)
 
 for m in "${BASELINE_MODELS[@]}"
 do
@@ -31,7 +31,7 @@ do
 			python sharpen.py \
 				--model_desc $m \
 				--max_epochs 20 \
-				--moment_count 3 \
+				--moment_count 5 \
 				--batch_size 12 \
 				--lr $lr \
 				--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"

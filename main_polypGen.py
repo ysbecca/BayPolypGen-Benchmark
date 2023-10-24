@@ -297,7 +297,7 @@ def main():
             name = opts.model_desc
 
         wandb.init(
-            project="TEST",
+            project=project_name,
             config={
                 "name": name,
                 "learning_rate": opts.lr,

@@ -293,7 +293,7 @@ if __name__ == '__main__':
             # bayesian pass thru all moments
             m_preds = []
 
-            for m in range(opts.moment_count):
+            for m in [0, 1, 2, 3]:
                 model = load_moment(m, model, device)
 
                 outputs = model(images.unsqueeze(0))

@@ -111,7 +111,7 @@ if __name__ == '__main__':
 # Are we using all the hyperparameters or just the name?
     if not args.dev_run:
        wandb.init(
-         project = "inference",
+         project = "inference_1",
          name = args.model_desc,
          config  = {
            "test_data": args.test_set

@@ -27,11 +27,11 @@ do
       then
               python main_polypGen.py \
                       --cycle_length 550 \
-                      --cycles 1 \
+                      --cycles 2 \
                       --epiupwt True \
                       --alpha 0.9 \
                       --kappa $k \
-                      --models_per_cycle 25 \
+                      --models_per_cycle 5 \
                       --model_desc $BASELINE_MODEL_DESC \
                       --model "deeplabv3plus_resnet50" \
                       --root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/" \
