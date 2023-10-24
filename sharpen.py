@@ -518,7 +518,7 @@ def main():
                 images = images.to(device, dtype=torch.float32)
                 labels = labels.to(device, dtype=torch.long)
      
-                optims[model_idx].zero_grad()
+                optims[moment_id].zero_grad()
                 outputs = m(images)
         
                 # =============== LOSS ======================
@@ -526,13 +526,13 @@ def main():
                 sharpen_loss = standard_loss(outputs, mean_preds_batch, weights, device)
 
                 if opts.loss_type == "pcgrad":
-                    optims[model_idex].pc_backward([sharpen_loss, std_loss])
+                    optims[moment_id].pc_backward([sharpen_loss, std_loss])
                 elif opts.loss_type == "sharpen":
                     sharpen_loss.backward()
                 else:
                     std_loss.backward()
     
-                optims[model_idex].step()
+                optims[moment_id].step()
 
                 # log batch loss...
                 if not opts.dev_run:
@@ -542,7 +542,7 @@ def main():
                     break
 
             # save sharpened moment without overwriting.
-            save_moment(model, model_idx, epoch=e)
+            save_moment(model, moment_id, epoch=e)
 
     score = predict_full_posterior(models, val_loader, len(val_dst), compute_acc=True, epoch=opts.moment_count)
     
