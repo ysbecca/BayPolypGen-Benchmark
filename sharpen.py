@@ -522,8 +522,10 @@ def main():
                 outputs = model(images)
         
                 # =============== LOSS ======================
-                std_loss = standard_loss(outputs, labels, criterion, weights_batch, device)
-                sharpen_loss = standard_loss(outputs, mean_preds_batch, weights_batch, device)
+                std_loss = standard_loss(outputs, labels, criterion,
+                    weights=weights_batch, device=device)
+                sharpen_loss = standard_loss(outputs, mean_preds_batch, criterion,
+                    weights=weights_batch, device=device)
 
                 if opts.loss_type == "pcgrad":
                     optims[moment_id].pc_backward([sharpen_loss, std_loss])
