@@ -1,13 +1,11 @@
 #!/bin/bash
 #SBATCH --account=bdlds05
-#SBATCH --time=48:0:0
+#SBATCH --time=12:0:0
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --array=0
-
-
-
+#SBATCH --mem=16G
 
 module load cuda
 
@@ -31,7 +29,7 @@ do
 			python sharpen.py \
 				--model_desc $m \
 				--max_epochs 20 \
-				--moment_count 5 \
+				--moment_count 3 \
 				--batch_size 12 \
 				--lr $lr \
 				--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"

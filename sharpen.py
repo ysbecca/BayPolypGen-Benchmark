@@ -294,7 +294,6 @@ def main():
 
     # models = [model for m in range(opts.moment_count)]
 
-    print("Loaded model", len(model))
 
     if opts.separable_conv and 'plus' in opts.model:
         network.convert_to_separable_conv(model.classifier)
@@ -423,7 +422,7 @@ def main():
         model.eval()
         return model
 
-    def predict_full_posterior(models, loader, size, compute_acc=False, epoch=0):
+    def predict_full_posterior(model, loader, size, compute_acc=False, epoch=0):
 
 
         if opts.dev_run:
@@ -443,11 +442,12 @@ def main():
 
         for model_idx in range(opts.moment_count):
             model = load_moment(model_idx, model.to(device), device, epoch=epoch)
-
+            model = model.to(device)
             m_preds = []
             for batch in enumerate(loader):
                 batch_idx, (images, labels, idxes) = batch
-
+                
+                images = images.to(device)
                 outputs = model(images)
                 preds_batch = outputs.detach().max(dim=1)[1].cpu().numpy()*255
                 preds_batch = preds_batch.astype(np.uint8)
@@ -498,7 +498,7 @@ def main():
     interval_loss = 0
 
     # assumes unshuffled set! only once on train
-    mean_preds, epis = predict_full_posterior(models, train_loader, len(train_dst), epoch=0)
+    mean_preds, epis = predict_full_posterior(model, train_loader, len(train_dst), epoch=0)
     weights = weighting_function(epis)
 
     train_loader = data.DataLoader(
@@ -519,7 +519,7 @@ def main():
                 labels = labels.to(device, dtype=torch.long)
      
                 optims[moment_id].zero_grad()
-                outputs = m(images)
+                outputs = model(images)
         
                 # =============== LOSS ======================
                 std_loss = standard_loss(outputs, labels, criterion, weights, device)
