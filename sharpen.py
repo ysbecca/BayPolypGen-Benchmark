@@ -365,11 +365,11 @@ def main():
         print(f"[{not opts.dev_run}] Model saved as {path}")    
 
 
-    def standard_loss(outputs, labels, criterion, weights=[], device=None):
-        if len(weights):
+    def standard_loss(outputs, labels, criterion, loss_weights=[], device=None):
+        if len(loss_weights):
             loss = F.cross_entropy(outputs, labels, reduction="none")
-            adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
-
+            adj_w = torch.tensor(loss_weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
+            
             loss *= adj_w
             return loss.sum() / len(labels)
         else:
@@ -522,8 +522,8 @@ def main():
                 outputs = model(images)
         
                 # =============== LOSS ======================
-                std_loss = standard_loss(outputs, labels, criterion, weights, device)
-                sharpen_loss = standard_loss(outputs, mean_preds_batch, weights, device)
+                std_loss = standard_loss(outputs, labels, criterion, weights_batch, device)
+                sharpen_loss = standard_loss(outputs, mean_preds_batch, weights_batch, device)
 
                 if opts.loss_type == "pcgrad":
                     optims[moment_id].pc_backward([sharpen_loss, std_loss])
