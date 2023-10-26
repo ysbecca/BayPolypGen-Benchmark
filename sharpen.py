@@ -365,11 +365,11 @@ def main():
         print(f"[{not opts.dev_run}] Model saved as {path}")    
 
 
-    def standard_loss(outputs, labels, criterion, loss_weights=[], device=None):
-        if len(loss_weights):
+    def standard_loss(outputs, labels, criterion, weights=[], device=None):
+        if len(weights):
             loss = F.cross_entropy(outputs, labels, reduction="none")
-            adj_w = torch.tensor(loss_weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
-            
+            adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
+
             loss *= adj_w
             return loss.sum() / len(labels)
         else:
