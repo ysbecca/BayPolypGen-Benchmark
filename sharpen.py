@@ -371,9 +371,11 @@ def main():
             adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
 
             loss *= adj_w
-            return loss.sum() / len(labels)
+            loss = loss.sum() / len(labels)
         else:
-            return F.cross_entropy(outputs, labels)
+            loss = F.cross_entropy(outputs, labels)
+        
+        return loss / (512*512)
 
     def weighting_function(epistemics):
         return torch.pow((1.0 + torch.tensor(epistemics)), opts.kappa)
@@ -382,7 +384,7 @@ def main():
     def save_moment(model, moment_id, epoch=-1):
         """ save moment checkpoint
         """
-        path = f"{opts.root}/moments/{model_desc}/{moment_id}"
+        path = f"{opts.root}moments/{opts.model_desc}/{moment_id}"
         if epoch > -1:
             path += f"_{epoch}s"
 
@@ -393,12 +395,12 @@ def main():
                 "model_state": model.state_dict(),
             }, path)
         print(f"[{not opts.dev_run}] Model MOMENT-S {moment_id} saved")
-
+        print(path)
 
     def load_moment(moment_id, model, device, epoch=0):
 
         if not epoch:
-            checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
+            checkpoint = torch.load(f"{opts.root}moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
             state_dict = checkpoint['model_state']
             
             try:
@@ -507,23 +509,27 @@ def main():
     for e in range(opts.max_epochs):
         print("Epoch", e)
         for moment_id in range(opts.moment_count):
+            torch.cuda.empty_cache()
             model = load_moment(moment_id, model.to(device), device, epoch=e)
 
             model.train()
             for batch in enumerate(train_loader):
                 batch_idx, (images, labels, idxes) = batch
-                mean_preds_batch = mean_preds[idxes]
+                mean_preds_batch = torch.from_numpy(mean_preds[idxes]).to(torch.long).to(device)
+
                 weights_batch = weights[idxes]
 
                 images = images.to(device, dtype=torch.float32)
-                labels = labels.to(device, dtype=torch.long)
-     
+                targets = labels.to(device, dtype=torch.long)
+
                 optims[moment_id].zero_grad()
                 outputs = model(images)
-        
+                
                 # =============== LOSS ======================
-                std_loss = standard_loss(outputs, labels, criterion,
+                std_loss = standard_loss(outputs, targets, criterion,
                     weights=weights_batch, device=device)
+                if len(mean_preds_batch.shape) == 4:
+                    mean_preds_batch = torch.argmax(mean_preds_batch, dim=1)
                 sharpen_loss = standard_loss(outputs, mean_preds_batch, criterion,
                     weights=weights_batch, device=device)
 
@@ -540,13 +546,14 @@ def main():
                 if not opts.dev_run:
                     wandb.log({"std loss": std_loss, "sharpen loss": sharpen_loss})
                 else:
+                    if batch_idx > 3:
                     # single batch per moment per epoch on dev mode
-                    break
+                        break
 
             # save sharpened moment without overwriting.
             save_moment(model, moment_id, epoch=e)
 
-    score = predict_full_posterior(models, val_loader, len(val_dst), compute_acc=True, epoch=opts.moment_count)
+    score = predict_full_posterior(model, val_loader, len(val_dst), compute_acc=True, epoch=e)
     
     if opts.dev_run:
         print(score)
