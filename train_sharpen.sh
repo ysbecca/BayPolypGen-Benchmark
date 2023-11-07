@@ -29,8 +29,8 @@ do
 			python sharpen.py \
 				--model_desc $m \
 				--max_epochs 2 \
-				--moment_count 3 \
-				--batch_size 12 \
+				--moment_count 2 \
+				--batch_size 2 \
 				--lr $lr \
 				--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 				# --root "/usr/not-backed-up/BayPolypGen-Benchmark/"
