@@ -292,6 +292,9 @@ def main():
     
         model = model_map[opts.model](num_classes=opts.num_classes, output_stride=opts.output_stride) 
 
+    if torch.cuda.device_count() > 1:
+        print("device_count", torch.cuda.device_count(), "activating nn.DataParallel.")
+        model = nn.DataParallel(model)
     # models = [model for m in range(opts.moment_count)]
 
 
@@ -426,7 +429,7 @@ def main():
 
     def predict_full_posterior(model, loader, size, compute_acc=False, epoch=0):
 
-
+        torch.cuda.empty_cache()
         if opts.dev_run:
             true_targets = np.zeros((opts.batch_size, 512, 512))
         else:
@@ -443,6 +446,7 @@ def main():
         m_logits = []
 
         for model_idx in range(opts.moment_count):
+            torch.cuda.empty_cache()
             model = load_moment(model_idx, model.to(device), device, epoch=epoch)
             model = model.to(device)
             m_preds = []
@@ -552,6 +556,7 @@ def main():
 
             # save sharpened moment without overwriting.
             save_moment(model, moment_id, epoch=e)
+            torch.cuda.empty_cache()
 
     score = predict_full_posterior(model, val_loader, len(val_dst), compute_acc=True, epoch=e)
     
