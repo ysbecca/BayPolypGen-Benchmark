@@ -193,6 +193,20 @@ def get_dataset(opts):
     return train_dst, val_dst
 
 
+class _CustomDataParallel(nn.Module):
+    def __init__(self, model):
+        super(_CustomDataParallel, self).__init__()
+        self.model = nn.DataParallel(model).cuda()
+
+    def forward(self, *input):
+        return self.model(*input)
+
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.model.module, name)
+
 def main():
     torch.cuda.is_available()
     torch.cuda.device_count()
@@ -293,8 +307,8 @@ def main():
         model = model_map[opts.model](num_classes=opts.num_classes, output_stride=opts.output_stride) 
 
     if torch.cuda.device_count() > 1:
-        print("device_count", torch.cuda.device_count(), "activating nn.DataParallel.")
-        model = nn.DataParallel(model)
+        print("device_count", torch.cuda.device_count(), "activating _CustomDataParallel.")
+        model = _CustomDataParallel(model)
     # models = [model for m in range(opts.moment_count)]
 
 
