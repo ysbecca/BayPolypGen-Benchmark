@@ -3,7 +3,7 @@
 #SBATCH --time=3:0:0
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:2
 #SBATCH --array=0
 #SBATCH --mem=32G
 
@@ -29,8 +29,9 @@ do
 			python sharpen.py \
 				--model_desc $m \
 				--max_epochs 2 \
-				--moment_count 2 \
-				--batch_size 2 \
+				--moment_count 3 \
+				--batch_size 6 \
+				--val_batch_size 12 \
 				--lr $lr \
 				--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 				# --root "/usr/not-backed-up/BayPolypGen-Benchmark/"
