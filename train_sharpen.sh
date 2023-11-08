@@ -19,7 +19,7 @@ task_id=0
 
 BASELINE_MODELS=("driven-sun-53") #"legendary-moon-51")
 LRS=(0.1) # 0.05 0.01)
-
+wandb offline
 for m in "${BASELINE_MODELS[@]}"
 do
 	for lr in "${LRS[@]}"
