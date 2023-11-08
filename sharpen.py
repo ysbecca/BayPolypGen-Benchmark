@@ -238,6 +238,7 @@ def main():
                      # env=opts.vis_env) if opts.enable_vis else None
     # if vis is not None:  # display options
         # vis.vis_table("Options", vars(opts))
+    torch.backends.cudnn.enabled = False
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opts.gpu_id
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
