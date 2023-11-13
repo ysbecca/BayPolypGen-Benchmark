@@ -392,7 +392,7 @@ def main():
         else:
             loss = F.cross_entropy(outputs, labels)
         
-        return loss / (512*512)
+        return loss / (len(labels)*512*512)
 
     def weighting_function(epistemics):
         return torch.pow((1.0 + torch.tensor(epistemics)), opts.kappa)
@@ -451,7 +451,10 @@ def main():
         model.eval()
         return model
 
-    def predict_full_posterior(model, loader, size, compute_acc=False, epoch=0):
+    def predict_full_posterior(model, loader, size, compute_acc=False, epoch=0, dummy=False):
+
+        if dummy:
+            return torch.Tensor(1159, 512, 512), np.random.rand(1159)
 
         torch.cuda.empty_cache()
         if opts.dev_run:
@@ -529,6 +532,12 @@ def main():
 
     # assumes unshuffled set! only once on train
     mean_preds, epis = predict_full_posterior(model, train_loader, len(train_dst), epoch=0)
+    
+    # one-time saving.
+    path = f"{opts.root}moments/{opts.model_desc}/"
+    torch.save(mean_preds, path + "mean_preds.pt")
+    np.save(path + "epis.pt", epis)
+    exit()
     weights = weighting_function(epis)
 
     train_loader = data.DataLoader(
