@@ -451,10 +451,14 @@ def main():
         model.eval()
         return model
 
-    def predict_full_posterior(model, loader, size, compute_acc=False, epoch=0, dummy=False):
+    def predict_full_posterior(model, loader, size, compute_acc=False, epoch=0, load=False):
 
-        if dummy:
-            return torch.Tensor(1159, 512, 512), np.random.rand(1159)
+        if load:
+            path = f"{opts.root}moments/{opts.model_desc}/"
+            m_preds = torch.load(path + "mean_preds.pt")
+            epis = np.load(path + "epis.npy")
+
+            return m_preds, epis
 
         torch.cuda.empty_cache()
         if opts.dev_run:
@@ -531,13 +535,7 @@ def main():
     interval_loss = 0
 
     # assumes unshuffled set! only once on train
-    mean_preds, epis = predict_full_posterior(model, train_loader, len(train_dst), epoch=0)
-    
-    # one-time saving.
-    path = f"{opts.root}moments/{opts.model_desc}/"
-    torch.save(mean_preds, path + "mean_preds.pt")
-    np.save(path + "epis.pt", epis)
-    exit()
+    mean_preds, epis = predict_full_posterior(model, train_loader, len(train_dst), epoch=0, load=True)
     weights = weighting_function(epis)
 
     train_loader = data.DataLoader(
