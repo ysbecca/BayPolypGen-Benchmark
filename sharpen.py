@@ -386,9 +386,9 @@ def main():
     def standard_loss(outputs, labels, criterion, weights=[], device=None):
         if len(weights):
             loss = F.cross_entropy(outputs, labels, reduction="none")
-            adj_w = torch.tensor(weights).unsqueeze(dim=1).unsqueeze(dim=1).to(device)
-
-            loss *= adj_w
+            weights = weights.unsqueeze(dim=1).unsqueeze(dim=1).to(device)
+            
+            loss *= weights 
             loss = loss.sum() / len(labels)
         else:
             loss = F.cross_entropy(outputs, labels)
@@ -569,6 +569,9 @@ def main():
                 sharpen_loss = standard_loss(outputs, mean_preds_batch, criterion,
                     weights=weights_batch, device=device)
 
+                print("std loss    ", std_loss)
+                print("sharpen loss", sharpen_loss)
+
                 if opts.loss_type == "pcgrad":
                     optims[moment_id].pc_backward([sharpen_loss, std_loss])
                 elif opts.loss_type == "sharpen":
@@ -577,7 +580,7 @@ def main():
                     std_loss.backward()
     
                 optims[moment_id].step()
-
+                torch.cuda.empty_cache()
                 # log batch loss...
                 if not opts.dev_run:
                     wandb.log({"std loss": std_loss, "sharpen loss": sharpen_loss})
