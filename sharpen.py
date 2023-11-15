@@ -1,10 +1,12 @@
 from tqdm import tqdm
 import network
 import utils
+import gc
 import os
 import random
 import argparse
 import numpy as np
+from torch.utils.checkpoint import checkpoint
 
 import torch.nn.functional as F
 from torch.utils import data
@@ -211,6 +213,9 @@ def main():
     torch.cuda.is_available()
     torch.cuda.device_count()
 
+    torch.backends.cudnn.benchmark =  True
+    torch.backends.cudnn.enabled =  True
+
     opts = get_argparser().parse_args()
     if opts.dataset.lower() == 'voc':
         opts.num_classes = 2 # foreground + background
@@ -238,7 +243,6 @@ def main():
                      # env=opts.vis_env) if opts.enable_vis else None
     # if vis is not None:  # display options
         # vis.vis_table("Options", vars(opts))
-    torch.backends.cudnn.enabled = False
 
     os.environ['CUDA_VISIBLE_DEVICES'] = opts.gpu_id
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -306,12 +310,14 @@ def main():
         }
     
         model = model_map[opts.model](num_classes=opts.num_classes, output_stride=opts.output_stride) 
+        
+        for p in model.parameters():
+            p.requires_grad_(False)
 
     if torch.cuda.device_count() > 1:
         print("device_count", torch.cuda.device_count(), "activating _CustomDataParallel.")
         model = _CustomDataParallel(model)
     # models = [model for m in range(opts.moment_count)]
-
 
     if opts.separable_conv and 'plus' in opts.model:
         network.convert_to_separable_conv(model.classifier)
@@ -386,14 +392,13 @@ def main():
     def standard_loss(outputs, labels, criterion, weights=[], device=None):
         if len(weights):
             loss = F.cross_entropy(outputs, labels, reduction="none")
-            weights = weights.unsqueeze(dim=1).unsqueeze(dim=1).to(device)
-            
-            loss *= weights 
+            loss *= weights.unsqueeze(dim=1).unsqueeze(dim=1).to(device)
             loss = loss.sum() / len(labels)
         else:
             loss = F.cross_entropy(outputs, labels)
         
         return loss / (len(labels)*512*512)
+        
 
     def weighting_function(epistemics):
         return torch.pow((1.0 + torch.tensor(epistemics)), opts.kappa)
@@ -540,8 +545,12 @@ def main():
     weights = weighting_function(epis)
 
     train_loader = data.DataLoader(
-        train_dst, batch_size=opts.batch_size, shuffle=True, num_workers=2)
-    
+        train_dst, batch_size=opts.batch_size, shuffle=False, num_workers=4)
+  
+    # unfreeze last classifier layer only of DeepLabV3+
+    for p in model.classifier.classifier:
+        p.requires_grad_(True)
+
     for e in range(opts.max_epochs):
         print("Epoch", e)
         for moment_id in range(opts.moment_count):
@@ -550,20 +559,24 @@ def main():
 
             model.train()
             for batch in enumerate(train_loader):
+                gc.collect()
+                
+                print(torch.cuda.memory_allocated())
                 batch_idx, (images, labels, idxes) = batch
+                print(batch_idx)
                 mean_preds_batch = torch.from_numpy(mean_preds[idxes]).to(torch.long).to(device)
 
                 weights_batch = weights[idxes]
 
                 images = images.to(device, dtype=torch.float32)
-                targets = labels.to(device, dtype=torch.long)
+                labels = labels.to(device, dtype=torch.long)
 
                 optims[moment_id].zero_grad()
                 outputs = model(images)
-                
+                 
                 # =============== LOSS ======================
-                std_loss = standard_loss(outputs, targets, criterion,
-                    weights=weights_batch, device=device)
+                std_loss = standard_loss(outputs, labels, criterion,
+                        weights=weights_batch, device=device)
                 if len(mean_preds_batch.shape) == 4:
                     mean_preds_batch = torch.argmax(mean_preds_batch, dim=1)
                 sharpen_loss = standard_loss(outputs, mean_preds_batch, criterion,
@@ -571,7 +584,7 @@ def main():
 
                 print("std loss    ", std_loss)
                 print("sharpen loss", sharpen_loss)
-
+                
                 if opts.loss_type == "pcgrad":
                     optims[moment_id].pc_backward([sharpen_loss, std_loss])
                 elif opts.loss_type == "sharpen":
@@ -580,7 +593,7 @@ def main():
                     std_loss.backward()
     
                 optims[moment_id].step()
-                torch.cuda.empty_cache()
+
                 # log batch loss...
                 if not opts.dev_run:
                     wandb.log({"std loss": std_loss, "sharpen loss": sharpen_loss})
@@ -588,10 +601,19 @@ def main():
                     if batch_idx > 3:
                     # single batch per moment per epoch on dev mode
                         break
+                del std_loss
+                del sharpen_loss
+                del outputs
+                del mean_preds_batch
+                del weights_batch
+                del labels
+                del images
+                del idxes
 
+                torch.cuda.empty_cache()
+                gc.collect()
             # save sharpened moment without overwriting.
             save_moment(model, moment_id, epoch=e)
-            torch.cuda.empty_cache()
 
     score = predict_full_posterior(model, val_loader, len(val_dst), compute_acc=True, epoch=e)
     
