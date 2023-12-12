@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=bdlds05
-#SBATCH --time=3:0:0
+#SBATCH --time=10:0:0
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
@@ -29,10 +29,11 @@ do
 			python sharpen.py \
 				--model_desc $m \
 				--max_epochs 2 \
-				--moment_count 3 \
-				--batch_size 6 \
+				--moment_count 5 \
+				--batch_size 8 \
 				--val_batch_size 12 \
 				--lr $lr \
+				--loss_type sharpen \
 				--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 				# --root "/usr/not-backed-up/BayPolypGen-Benchmark/"
 

@@ -549,7 +549,7 @@ def main():
     weights = weighting_function(epis)
 
     train_loader = data.DataLoader(
-        train_dst, batch_size=opts.batch_size, shuffle=False, num_workers=4)
+        train_dst, batch_size=opts.batch_size, shuffle=True, num_workers=4)
   
     # unfreeze last classifier layer only of DeepLabV3+
     for p in model.classifier.classifier:
@@ -567,7 +567,7 @@ def main():
                 
                 print(torch.cuda.memory_allocated())
                 batch_idx, (images, labels, idxes) = batch
-                print(batch_idx)
+                print(batch_idx, idxes)
                 mean_preds_batch = torch.from_numpy(mean_preds[idxes]).to(torch.long).to(device)
 
                 weights_batch = weights[idxes]
@@ -595,7 +595,8 @@ def main():
                     sharpen_loss.backward()
                 else:
                     std_loss.backward()
-    
+   
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optims[moment_id].step()
 
                 # log batch loss...
