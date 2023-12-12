@@ -307,10 +307,17 @@ def main():
     
         model = model_map[opts.model](num_classes=opts.num_classes, output_stride=opts.output_stride) 
 
+        # turn off gradients for all but final layers.
+        for j, p in enumerate(model.parameters()):
+
+
     if torch.cuda.device_count() > 1:
         print("device_count", torch.cuda.device_count(), "activating _CustomDataParallel.")
         model = _CustomDataParallel(model)
     # models = [model for m in range(opts.moment_count)]
+
+
+
 
 
     if opts.separable_conv and 'plus' in opts.model:
@@ -444,8 +451,8 @@ def main():
                 model.load_state_dict(new_state_dict)
         
         else:
-            print(f'Loading {moment_id}_{epoch}s.pt')
-            checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}_{epoch}s.pt", map_location=device)
+            print(f'Loading {moment_id}_{epoch - 1}s.pt')
+            checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}_{epoch - 1}s.pt", map_location=device)
             state_dict = checkpoint['model_state']
             model.load_state_dict(state_dict)
 
@@ -479,7 +486,7 @@ def main():
 
         for model_idx in range(opts.moment_count):
             torch.cuda.empty_cache()
-            model = load_moment(model_idx, model.to(device), device, epoch=epoch)
+            model = load_moment(model_idx, model.to(device), device, epoch=epoch + 1)
             model = model.to(device)
             m_preds = []
             for batch in enumerate(loader):
