@@ -296,6 +296,11 @@ def main():
             project_name = "epiupwt_1"
             name = opts.model_desc
 
+        if opts.extra_C6:
+            project_name = "bay_cuts"
+        if opts.extra_C6 and opts.epiupwt:
+            project_name = "epiupwt_cuts"
+
         wandb.init(
             project=project_name,
             config={

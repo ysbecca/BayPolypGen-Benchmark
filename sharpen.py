@@ -314,10 +314,6 @@ def main():
         for p in model.parameters():
             p.requires_grad_(False)
 
-        # turn off gradients for all but final layers.
-        for j, p in enumerate(model.parameters()):
-
-
     if torch.cuda.device_count() > 1:
         print("device_count", torch.cuda.device_count(), "activating _CustomDataParallel.")
         model = _CustomDataParallel(model)

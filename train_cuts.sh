@@ -4,7 +4,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-4
+#SBATCH --array=0-3
 
 module load cuda
 source /nobackup/projects/bdlds05/rsstone/miniconda/etc/profile.d/conda.sh
@@ -17,7 +17,6 @@ CUTS=(116 \
 	59 \
 	29 \
 	15 \
-	0 \
 )
 
 task_id=0
@@ -32,7 +31,7 @@ do
 			--alpha 0.9 \
 			--cycles 2 \
 			--extra_C6 $c \
-			--models_per_cycle 10 \
+			--models_per_cycle 5 \
 			--model "deeplabv3plus_resnet50" \
 			--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/" \
 			--lr 0.1

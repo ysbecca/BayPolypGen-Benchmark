@@ -30,8 +30,8 @@ do
 				--model_desc $m \
 				--max_epochs 2 \
 				--moment_count 5 \
-				--batch_size 8 \
-				--val_batch_size 12 \
+				--batch_size 16 \
+				--val_batch_size 24 \
 				--lr $lr \
 				--loss_type sharpen \
 				--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
