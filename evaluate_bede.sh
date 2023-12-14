@@ -81,6 +81,8 @@ do
 				python metrics/compute_seg.py \
 					--model_desc $model \
 					--test_set $dst \
+					--is_sharpen True \
+					--epoch $e \
 					--root $ROOT
 
 				echo "inference and evaluation done - sharpen."

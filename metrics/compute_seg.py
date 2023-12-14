@@ -84,6 +84,11 @@ def get_args():
     parser.add_argument("--test_set", type=str, default='C6_pred',
                         help='EndoCV_DATA3, EndoCV_DATA4')
 
+    parser.add_argument("--is_sharpen", type=bool, default=False,
+                        help="sharpened?")
+    parser.add_argument("--epoch", type=int,
+                        help="sharpening epoch for sharpened")
+
     parser.add_argument("--dev_run", type=bool, default=False)
 
     # Peter: the results will be in {args.root}/EndoCV2021/{args.model_desc}/segmentation/...
@@ -111,10 +116,11 @@ if __name__ == '__main__':
 # Are we using all the hyperparameters or just the name?
     if not args.dev_run:
        wandb.init(
-         project = "inference_1",
+         project = "inference_2",
          name = args.model_desc,
          config  = {
-           "test_data": args.test_set
+           "test_data": args.test_set,
+           "is_sharpen": args.is_sharpen,
          }
        )
     
@@ -128,6 +134,8 @@ if __name__ == '__main__':
     
     # evaluation/predicted folder
     participantsFolder = f"{args.root}predictions/images_{args.test_set}/{args.model_desc}"
+    if args.is_sharpen:
+        path += f"/{args.epoch}s"
     print(participantsFolder)
 
     # save folder
@@ -336,15 +344,18 @@ if __name__ == '__main__':
         }   
 
         if not args.dev_run:  
-            wandb.log({
+            stats = {
                 "dice": dice_scores.mean(axis=0)[0], "dice_std": np.std(dice_scores),
                 "jaccard": jac_scores.mean(axis=0)[0], "jc_std": np.std(jac_scores),
                 "f2": f2_scores.mean(axis=0)[0], "f2_std": np.std(f2_scores),
                 "PPV": PPV_scores.mean(axis=0)[0], "PPV_std": np.std(PPV_scores),
                 "recall": Rec_scores.mean(axis=0)[0], "recall_std": np.std(Rec_scores),
                 "OverallAcc": np.mean(acc_scores), "acc_std": np.std(acc_scores)
-            })
-
+            }
+            if args.is_sharpen:
+                stats["s_epoch"]: args.epoch
+            
+            wandb.log(stats)
             wandb.finish()
         # write to json      
         jsonFileName=args.jsonFileName
