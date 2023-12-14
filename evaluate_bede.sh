@@ -91,7 +91,7 @@ do
 				exit 0
 			fi
 			let task_id=$task_id+1
-		fi
+		done
 	done
 done
 
