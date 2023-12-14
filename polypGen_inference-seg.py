@@ -65,6 +65,11 @@ def get_argparser():
     parser.add_argument("--moment_count", type=int, default='2',
                         help="total number of moments from posterior")
 
+    parser.add_argument("--is_sharpen", type=bool, default=False,
+                        help="sharpened?")
+    parser.add_argument("--epoch", type=int,
+                        help="sharpening epoch for sharpened")
+
     parser.add_argument("--backbone", type=str, default='resnet50',
                         choices=['vgg19',  'resnet34' , 'resnet50',
                                  'resnet101', 'densenet121', 'none'], help='model name')
@@ -176,10 +181,15 @@ def mymodel():
     #     new_state_dict[k]=v
 
 
-
 def load_moment(moment_id, model, device):
 
-    checkpoint = torch.load(f"{opts.root}moments/{opts.model_desc}/{moment_id}.pt", map_location=device)
+    if opts.is_sharpen:
+        ckpt_name = f"{moment_id}_{opts.epoch}s"
+    else:
+        ckpt_name = f"{moment_id}"
+
+    print(f"[INFO] checkpoint: {ckpt_name}")
+    checkpoint = torch.load(f"{opts.root}moments/{opts.model_desc}/{ckpt_name}.pt", map_location=device)
     state_dict = checkpoint['model_state']
 
     try:
