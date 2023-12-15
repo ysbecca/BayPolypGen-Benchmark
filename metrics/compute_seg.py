@@ -88,6 +88,8 @@ def get_args():
                         help="sharpened?")
     parser.add_argument("--epoch", type=int,
                         help="sharpening epoch for sharpened")
+    parser.add_argument("--lr", type=float,
+                        help="sharpening lr")
 
     parser.add_argument("--dev_run", type=bool, default=False)
 
@@ -135,7 +137,7 @@ if __name__ == '__main__':
     # evaluation/predicted folder
     participantsFolder = f"{args.root}predictions/images_{args.test_set}/{args.model_desc}"
     if args.is_sharpen:
-        participantsFolder += f"/{args.epoch}s"
+        participantsFolder += f"/{args.epoch}s_lr{args.lr}"
     print(participantsFolder)
 
     # save folder

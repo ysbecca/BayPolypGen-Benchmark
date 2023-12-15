@@ -21,7 +21,7 @@ import skimage.transform
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 
-def create_predFolder(root, model_desc, test_data=None, sharpen=False, epoch=0):
+def create_predFolder(root, model_desc, test_data=None, lr=None, sharpen=False, epoch=0):
     #path = f"{root}predictions/images_C6_pred/{model_desc}/"
     #if test_data:
     folder_path = f"{root}/predictions/images_{test_data}/"
@@ -30,8 +30,8 @@ def create_predFolder(root, model_desc, test_data=None, sharpen=False, epoch=0):
     path = f"{root}/predictions/images_{test_data}/{model_desc}/"
 
     if sharpen:
-        path += f"{epoch}s/"
-        
+        path += f"{epoch}s_lr{lr}/"
+
     if not os.path.exists(path):
       os.mkdir(path)
         
@@ -73,6 +73,8 @@ def get_argparser():
                         help="sharpened?")
     parser.add_argument("--epoch", type=int,
                         help="sharpening epoch for sharpened")
+    parser.add_argument("--lr", type=float,
+                        help="sharpening lr")
 
     parser.add_argument("--backbone", type=str, default='resnet50',
                         choices=['vgg19',  'resnet34' , 'resnet50',
@@ -188,7 +190,7 @@ def mymodel():
 def load_moment(moment_id, model, device):
 
     if opts.is_sharpen:
-        ckpt_name = f"{moment_id}_{opts.epoch}s"
+        ckpt_name = f"{moment_id}_{opts.epoch}s_lr{opts.lr}"
     else:
         ckpt_name = f"{moment_id}"
 
@@ -247,6 +249,7 @@ if __name__ == '__main__':
     saveDir = create_predFolder(opts.root, opts.model_desc, opts.test_set,
         sharpen=opts.is_sharpen,
         epoch=opts.epoch,
+        lr=opts.lr,
     )
     
     # ----> three test folders [https://github.com/sharibox/EndoCV2021-polyp_det_seg_gen/wiki/EndoCV2021-Leaderboard-guide]

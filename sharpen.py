@@ -409,7 +409,7 @@ def main():
         """
         path = f"{opts.root}moments/{opts.model_desc}/{moment_id}"
         if epoch > -1:
-            path += f"_{epoch}s"
+            path += f"_{epoch}s_lr{opts.lr}"
 
         path += ".pt"
 
@@ -449,8 +449,8 @@ def main():
                 model.load_state_dict(new_state_dict)
         
         else:
-            print(f'Loading {moment_id}_{epoch - 1}s.pt')
-            checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}_{epoch - 1}s.pt", map_location=device)
+            print(f'Loading {moment_id}_{epoch - 1}s_lr{opts.lr}.pt')
+            checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}_{epoch - 1}s_lr{opts.lr}.pt", map_location=device)
             state_dict = checkpoint['model_state']
             model.load_state_dict(state_dict)
 

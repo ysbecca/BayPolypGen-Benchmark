@@ -21,6 +21,7 @@ SHARPEN_MODELS=()
 EPOCHS=(0 1)
 
 DATASETS=("C6_pred" "EndoCV_DATA3" "EndoCV_DATA4")
+LRS=(0.1 0.05 0.01)
 
 # TODO 2: fill in these paths
 export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
@@ -65,29 +66,34 @@ do
 	do
 		for e in "${EPOCHS[@]}"
 		do
-			if [ $task_id = $SLURM_ARRAY_TASK_ID ]
-			then
-				python polypGen_inference-seg.py \
-					--moment_count 6 \
-					--test_set $dst \
-					--is_sharpen True \
-					--epoch $e \
-					--model_desc $model \
-					--root $ROOT
+			for lr in "${LRS[@]}"
+			do
+				if [ $task_id = $SLURM_ARRAY_TASK_ID ]
+				then
+					python polypGen_inference-seg.py \
+						--moment_count 6 \
+						--test_set $dst \
+						--is_sharpen True \
+						--epoch $e \
+						--lr $lr \
+						--model_desc $model \
+						--root $ROOT
 
-				python metrics/compute_seg.py \
-					--model_desc $model \
-					--test_set $dst \
-					--is_sharpen True \
-					--epoch $e \
-					--root $ROOT
+					python metrics/compute_seg.py \
+						--model_desc $model \
+						--test_set $dst \
+						--is_sharpen True \
+						--epoch $e \
+						--lr $lr \
+						--root $ROOT
 
-				echo "inference and evaluation done - sharpen."
-				echo $model
-				echo $dst
-				exit 0
-			fi
-			let task_id=$task_id+1
+					echo "inference and evaluation done - sharpen."
+					echo $model
+					echo $dst
+					exit 0
+				fi
+				let task_id=$task_id+1
+			done
 		done
 	done
 done
