@@ -135,7 +135,7 @@ if __name__ == '__main__':
     # evaluation/predicted folder
     participantsFolder = f"{args.root}predictions/images_{args.test_set}/{args.model_desc}"
     if args.is_sharpen:
-        path += f"/{args.epoch}s"
+        participantsFolder += f"/{args.epoch}s"
     print(participantsFolder)
 
     # save folder

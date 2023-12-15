@@ -21,13 +21,17 @@ import skimage.transform
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 
-def create_predFolder(root, model_desc, test_data=None):
+def create_predFolder(root, model_desc, test_data=None, sharpen=False, epoch=0):
     #path = f"{root}predictions/images_C6_pred/{model_desc}/"
     #if test_data:
     folder_path = f"{root}/predictions/images_{test_data}/"
     if not os.path.exists(folder_path):
       os.mkdir(folder_path)
     path = f"{root}/predictions/images_{test_data}/{model_desc}/"
+
+    if sharpen:
+        path += f"{epoch}s/"
+        
     if not os.path.exists(path):
       os.mkdir(path)
         
@@ -240,7 +244,10 @@ if __name__ == '__main__':
 #    else:
 #        dirN = 'test_best_endocv2021'+opts.model+'_'+opts.backbone
     # set image folder here! ./frosty/segmentation
-    saveDir = create_predFolder(opts.root, opts.model_desc, opts.test_set)
+    saveDir = create_predFolder(opts.root, opts.model_desc, opts.test_set,
+        sharpen=opts.is_sharpen,
+        epoch=opts.epoch,
+    )
     
     # ----> three test folders [https://github.com/sharibox/EndoCV2021-polyp_det_seg_gen/wiki/EndoCV2021-Leaderboard-guide]
     

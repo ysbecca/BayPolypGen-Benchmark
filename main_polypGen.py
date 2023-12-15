@@ -188,7 +188,7 @@ def get_dataset(opts):
     if opts.epiupwt:
         epi_dims = (opts.models_per_cycle, 2, 512, 512)
     else:
-        epi_dims = None 
+        epi_dims = None
 
     indices = True if opts.cycles == 0 else False
 
