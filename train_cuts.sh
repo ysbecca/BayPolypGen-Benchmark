@@ -9,7 +9,9 @@
 module load cuda
 source /nobackup/projects/bdlds05/rsstone/miniconda/etc/profile.d/conda.sh
 conda activate pyvis
-echo "b"
+
+
+wandb online
 export WANDB_MODE=online
 export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 
@@ -31,7 +33,7 @@ do
 			--alpha 0.9 \
 			--cycles 2 \
 			--extra_C6 $c \
-			--models_per_cycle 5 \
+			--models_per_cycle 10 \
 			--model "deeplabv3plus_resnet50" \
 			--root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/" \
 			--lr 0.1

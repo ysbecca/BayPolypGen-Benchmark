@@ -11,15 +11,12 @@ module load cuda
 source /nobackup/projects/bdlds05/rsstone/miniconda/etc/profile.d/conda.sh
 conda activate pyvis
 
+wandb online
 export WANDB_MODE=online
 
 # TODO 1: fill in the MODELS list with all the string model descs you want to evaluate
-MODELS=("unique-durian-1" \
-	"dainty-darkness-2" \
-	"polar-planet-3" \
-	"sparkling-microwave-4" \
-)
-SHARPEN_MODELS=("prime-water-15")
+MODELS=()
+SHARPEN_MODELS=()
 
 EPOCHS=(0 1)
 
