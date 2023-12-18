@@ -24,10 +24,10 @@ import matplotlib.pyplot as plt
 def create_predFolder(root, model_desc, test_data=None, lr=None, sharpen=False, epoch=0):
     #path = f"{root}predictions/images_C6_pred/{model_desc}/"
     #if test_data:
-    folder_path = f"{root}/predictions/images_{test_data}/"
+    folder_path = f"{root}predictions/images_{test_data}/"
     if not os.path.exists(folder_path):
       os.mkdir(folder_path)
-    path = f"{root}/predictions/images_{test_data}/{model_desc}/"
+    path = f"{root}predictions/images_{test_data}/{model_desc}/"
 
     if sharpen:
         path += f"{epoch}s_lr{lr}/"
