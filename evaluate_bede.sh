@@ -4,8 +4,9 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-17
+#SBATCH --array=0-23
 
+# 24 cuts
 module load cuda
 
 source /nobackup/projects/bdlds05/rsstone/miniconda/etc/profile.d/conda.sh
@@ -68,47 +69,6 @@ do
 		let task_id=$task_id+1
 	done
 done
-
-echo "now evaluating sharpen models"
-
-for model in "${SHARPEN_MODELS[@]}"
-do
-	for dst in "${DATASETS[@]}"
-	do
-		for e in "${EPOCHS[@]}"
-		do
-			for lr in "${LRS[@]}"
-			do
-				if [ $task_id = $SLURM_ARRAY_TASK_ID ]
-				then
-					python polypGen_inference-seg.py \
-						--moment_count 5 \
-						--test_set $dst \
-						--is_sharpen True \
-						--epoch $e \
-						--lr $lr \
-						--model_desc $model \
-						--root $ROOT
-
-					python metrics/compute_seg.py \
-						--model_desc $model \
-						--test_set $dst \
-						--is_sharpen True \
-						--epoch $e \
-						--lr $lr \
-						--root $ROOT
-
-					echo "inference and evaluation done - sharpen."
-					echo $model
-					echo $dst
-					exit 0
-				fi
-				let task_id=$task_id+1
-			done
-		done
-	done
-done
-
 
 
 # python polypGen_inference-seg.py --moment_count 7 --model_desc "driven-sun-53" --root /users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/
