@@ -4,7 +4,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:2
-#SBATCH --array=0
+#SBATCH --array=0-2
 #SBATCH --mem=32G
 
 module load cuda
