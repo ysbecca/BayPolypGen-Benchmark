@@ -28,12 +28,14 @@ def create_predFolder(root, model_desc, test_data=None, lr=None, sharpen=False, 
     if not os.path.exists(folder_path):
       os.mkdir(folder_path)
     path = f"{root}predictions/images_{test_data}/{model_desc}/"
-
+    if not os.path.exists(path):
+      os.mkdir(path)
+      
     if sharpen:
         path += f"{epoch}s_lr{lr}/"
 
-    if not os.path.exists(path):
-      os.mkdir(path)
+        if not os.path.exists(path):
+          os.mkdir(path)
         
     return path
 
