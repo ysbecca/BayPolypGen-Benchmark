@@ -190,6 +190,7 @@ def mymodel():
 def load_moment(moment_id, model, device):
 
     if opts.is_sharpen:
+        # 0_2s_lr0.01.pt
         ckpt_name = f"{moment_id}_{opts.epoch}s_lr{opts.lr}"
     else:
         ckpt_name = f"{moment_id}"

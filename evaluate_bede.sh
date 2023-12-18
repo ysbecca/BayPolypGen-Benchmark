@@ -13,19 +13,30 @@ conda activate pyvis
 
 wandb online
 export WANDB_MODE=online
+export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
+ROOT="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 
 # TODO 1: fill in the MODELS list with all the string model descs you want to evaluate
-MODELS=()
-SHARPEN_MODELS=()
+MODELS=("magic-mountain-6" \
+	"ethereal-wave-7" \
+	"hardy-field-8" \
+	"quiet-terrain-9" \
+	"sage-cosmos-2" \
+	"genial-grass-3" \
+	"warm-valley-4" \
+	"dulcet-cosmos-5" \
+)
 
-EPOCHS=(0 1)
+SHARPEN_MODELS=("restful-salad-16" \
+	"glorious-blaze-17" \
+	"revived-eon-18" \
+)
+
+EPOCHS=(0 1 2)
 
 DATASETS=("C6_pred" "EndoCV_DATA3" "EndoCV_DATA4")
 LRS=(0.1 0.05 0.01)
 
-# TODO 2: fill in these paths
-export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
-ROOT="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 
 # TODO 3: if there are N models, set task array count to N-1 in line 7 for SLURM; 
 # or replace with Sun Grid Engine syntax
@@ -38,7 +49,7 @@ do
 		if [ $task_id = $SLURM_ARRAY_TASK_ID ]
 		then
 			python polypGen_inference-seg.py \
-				--moment_count 6 \
+				--moment_count 5 \
 				--test_set $dst \
 				--model_desc $model \
 				--root $ROOT
@@ -71,7 +82,7 @@ do
 				if [ $task_id = $SLURM_ARRAY_TASK_ID ]
 				then
 					python polypGen_inference-seg.py \
-						--moment_count 6 \
+						--moment_count 5 \
 						--test_set $dst \
 						--is_sharpen True \
 						--epoch $e \
