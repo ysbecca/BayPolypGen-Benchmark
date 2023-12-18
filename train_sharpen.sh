@@ -12,14 +12,15 @@ module load cuda
 source /nobackup/projects/bdlds05/rsstone/miniconda/etc/profile.d/conda.sh
 conda activate pyvis
 
+wandb online
 export WANDB_MODE=online
 export WANDB_DIR="/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
 
 task_id=0
 
 BASELINE_MODELS=("driven-sun-53") #"legendary-moon-51")
-LRS=(0.1) # 0.05 0.01)
-wandb offline
+LRS=(0.1 0.05 0.01)
+
 for m in "${BASELINE_MODELS[@]}"
 do
 	for lr in "${LRS[@]}"
@@ -28,7 +29,7 @@ do
 		then
 			python sharpen.py \
 				--model_desc $m \
-				--max_epochs 2 \
+				--max_epochs 3 \
 				--moment_count 5 \
 				--batch_size 16 \
 				--val_batch_size 24 \
