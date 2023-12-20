@@ -200,16 +200,13 @@ def load_moment(moment_id, model, device):
     checkpoint = torch.load(f"{opts.root}moments/{opts.model_desc}/{ckpt_name}.pt", map_location=device)
     state_dict = checkpoint['model_state']
 
-    # found: model.module.backbone.conv1.weight
-    # wanted: module.backbone.conv1.weight
-
     try:
         model.load_state_dict(state_dict)
 
     except:
         new_state_dict = OrderedDict()
         sample_item = next(iter(state_dict.items()))
-        if 'module' not in sample_item:
+        if 'module' not in sample_item[0]:
             for k, v in state_dict.items():
                  if 'module' not in k:
                      k = 'module.'+k
@@ -217,10 +214,9 @@ def load_moment(moment_id, model, device):
                      k = k.replace('features.module.', 'module.features.')
                  new_state_dict[k]=v
         else:
-            print("BINGOOO - found module in the key names")
             for k, v in state_dict.items():
                 k = ".".join(k.split(".")[1:])
-            new_state_dict[k]=v
+                new_state_dict[k]=v
 
         model.load_state_dict(new_state_dict)
             
