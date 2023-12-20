@@ -30,7 +30,7 @@ def create_predFolder(root, model_desc, test_data=None, lr=None, sharpen=False, 
     path = f"{root}predictions/images_{test_data}/{model_desc}/"
     if not os.path.exists(path):
       os.mkdir(path)
-      
+
     if sharpen:
         path += f"{epoch}s_lr{lr}/"
 
@@ -206,12 +206,18 @@ def load_moment(moment_id, model, device):
 
     except:
         new_state_dict = OrderedDict()
-        for k, v in state_dict.items():
-             if 'module' not in k:
-                 k = 'module.'+k
-             else:
-                 k = k.replace('features.module.', 'module.features.')
-             new_state_dict[k]=v
+        try:
+            for k, v in state_dict.items():
+                 if 'module' not in k:
+                     k = 'module.'+k
+                 else:
+                     k = k.replace('features.module.', 'module.features.')
+                 new_state_dict[k]=v
+        except:
+            for k, v in state_dict.items():
+                 if 'model' not in k:
+                     k = 'model.'+k
+                 new_state_dict[k]=v
 
         model.load_state_dict(new_state_dict)
             
