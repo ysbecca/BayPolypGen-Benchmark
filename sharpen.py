@@ -452,7 +452,26 @@ def main():
             print(f'Loading {moment_id}_{epoch - 1}s_lr{opts.lr}.pt')
             checkpoint = torch.load(f"{opts.root}/moments/{opts.model_desc}/{moment_id}_{epoch - 1}s_lr{opts.lr}.pt", map_location=device)
             state_dict = checkpoint['model_state']
-            model.load_state_dict(state_dict)
+
+            try:
+                model.load_state_dict(state_dict)
+            except:
+                new_state_dict = OrderedDict()
+
+                if torch.cuda.device_count() > 1:
+                    for k, v in state_dict.items():
+                        if 'module' not in k:
+                            k = 'model.module.'+k
+                        new_state_dict[k] = v
+                else:
+
+                    for k, v in state_dict.items():
+                        if 'module' not in k:
+                            k = 'module.'+k
+                        else:
+                            k = k.replace('features.module.', 'module.features.')
+                        new_state_dict[k] = v
+                model.load_state_dict(new_state_dict)
 
         model.eval()
         return model
