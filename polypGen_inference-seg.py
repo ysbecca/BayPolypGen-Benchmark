@@ -208,7 +208,8 @@ def load_moment(moment_id, model, device):
 
     except:
         new_state_dict = OrderedDict()
-        if 'module' not in state_dict.items()[0]:
+        sample_item = next(iter(state_dict.items()))
+        if 'module' not in sample_item:
             for k, v in state_dict.items():
                  if 'module' not in k:
                      k = 'module.'+k
@@ -218,8 +219,8 @@ def load_moment(moment_id, model, device):
         else:
             print("BINGOOO - found module in the key names")
             for k, v in state_dict.items():
-                    k = ".".join(k.split(".")[1:])
-                new_state_dict[k]=v
+                k = ".".join(k.split(".")[1:])
+            new_state_dict[k]=v
 
         model.load_state_dict(new_state_dict)
             
