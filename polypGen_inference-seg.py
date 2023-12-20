@@ -215,8 +215,8 @@ def load_moment(moment_id, model, device):
                  new_state_dict[k]=v
         except:
             for k, v in state_dict.items():
-                 if 'model' not in k:
-                     k = 'model.'+k
+                 if 'model' in k:
+                     k = k.split(".")[1:]
                  new_state_dict[k]=v
 
         model.load_state_dict(new_state_dict)
