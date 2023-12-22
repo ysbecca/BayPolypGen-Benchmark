@@ -199,26 +199,40 @@ def load_moment(moment_id, model, device):
     print(f"[INFO] checkpoint: {ckpt_name}")
     checkpoint = torch.load(f"{opts.root}moments/{opts.model_desc}/{ckpt_name}.pt", map_location=device)
     state_dict = checkpoint['model_state']
-
+    fail = True
     try:
-        model.load_state_dict(state_dict)
-
-    except:
+        # for sharpen eval not sure why...
         new_state_dict = OrderedDict()
-        sample_item = next(iter(state_dict.items()))
-        if 'module' not in sample_item[0]:
-            for k, v in state_dict.items():
-                 if 'module' not in k:
-                     k = 'module.'+k
-                 else:
-                     k = k.replace('features.module.', 'module.features.')
-                 new_state_dict[k]=v
-        else:
-            for k, v in state_dict.items():
-                k = ".".join(k.split(".")[1:])
+        for k, v in state_dict.items():
+             if 'module' in k:
+                 k = ".".join(k.split(".")[1:])
                 new_state_dict[k]=v
+        model.load_state_dict(state_dict)
+        fail = False
+    except:
+        pass
+
+    if fail:
+        try:
+            model.load_state_dict(state_dict)
+
+        except:
+            new_state_dict = OrderedDict()
+            sample_item = next(iter(state_dict.items()))
+            if 'module' not in sample_item[0]:
+                for k, v in state_dict.items():
+                     if 'module' not in k:
+                         k = 'module.'+k
+                     else:
+                         k = k.replace('features.module.', 'module.features.')
+                     new_state_dict[k]=v
+            else:
+                for k, v in state_dict.items():
+                    k = ".".join(k.split(".")[1:])
+                    new_state_dict[k]=v
 
         model.load_state_dict(new_state_dict)
+
             
     model.eval()
 
