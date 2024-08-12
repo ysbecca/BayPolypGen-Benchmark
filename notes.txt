@@ -1,0 +1,30 @@
+python sharpen.py     --model_desc "driven-sun-53"     --max_epochs 1     --moment_count 3     --batch_size 8     --val_batch_size 24     --lr 0.001     --root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
+
+^ gets CUDN exception at batch 123. Layers frozen.
+
+
+python sharpen.py     --model_desc "driven-sun-53"     --max_epochs 1     --moment_count 3     --batch_size 8     --val_batch_size 24     --lr 0.0001     --root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
+
+^ could it be the loss values in pc_grad not combining properly? doesn't look like values are too small... but maybe something weird with the norm projection... try smaller LR. NOPE. still same error, same batch 123.
+
+
+python sharpen.py     --model_desc "driven-sun-53"     --max_epochs 1     --moment_count 3     --batch_size 8     --val_batch_size 24     --lr 0.001     --root "/users/rsstone/projects_sym/rsstone/BayPolypGen-Benchmark/"
+
+WITH
+
+torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
+^ what about gradient clipping...I did it for epiupwt, maybe I should do it here too right after backward().
+
+
+
+
+
+
+#SBATCH --account=bdlds05
+#SBATCH --time=6:0:0
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:4
+#SBATCH --array=0
+#SBATCH --mem=32G
