@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=bdlds05
-#SBATCH --time=4:00:0
+#SBATCH --time=2:00:0
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
